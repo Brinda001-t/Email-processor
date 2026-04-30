@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+env/
+
+# Django
+*.sqlite3
+db.sqlite3
+
+# Environment variables - NEVER push this
+.env
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Temp files
+*.pdf
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

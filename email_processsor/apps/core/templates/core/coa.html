@@ -1,0 +1,57 @@
+{% extends "core/base.html" %}
+{% block nav_coa %}active{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4">COA Records</h4>
+
+<div class="card p-4">
+  <table class="table table-hover table-sm">
+    <thead class="table-light">
+      <tr>
+        <th>#</th>
+        <th>Company</th>
+        <th>Product</th>
+        <th>Lot Number</th>
+        <th>Lot Quantity</th>
+        <th>Manufacture Date</th>
+        <th>Expiration Date</th>
+        <th>Approved By</th>
+        <th>Status</th>
+        <th>PDF</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for record in records %}
+      <tr>
+        <td>{{ record.id }}</td>
+        <td>{{ record.company|default:"—" }}</td>
+        <td>{{ record.product_name|default:"—" }}</td>
+        <td>{{ record.lot_number|default:"—" }}</td>
+        <td>{{ record.lot_quantity|default:"—" }}</td>
+        <td>{{ record.manufacture_date|default:"—" }}</td>
+        <td>{{ record.expiration_date|default:"—" }}</td>
+        <td>{{ record.approved_by|default:"—" }}</td>
+        <td>
+          {% if record.status == "COMPLETED" %}
+            <span class="badge bg-success">COMPLETED</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">{{ record.status }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if record.pdf_url %}
+            <a href="{{ record.pdf_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-file-pdf"></i> View
+            </a>
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="10" class="text-center text-muted">No COA records found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "core/base.html" %}
+{% block nav_escalations %}active{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4">Escalation Records</h4>
+
+<div class="card p-4">
+  <table class="table table-hover table-sm">
+    <thead class="table-light">
+      <tr>
+        <th>#</th>
+        <th>Subject</th>
+        <th>Sender</th>
+        <th>Reason</th>
+        <th>Teams Alert Sent</th>
+        <th>Received</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for record in records %}
+      <tr>
+        <td>{{ record.id }}</td>
+        <td>{{ record.email.subject }}</td>
+        <td>{{ record.email.sender }}</td>
+        <td>{{ record.reason }}</td>
+        <td>
+          {% if record.teams_sent %}
+            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Sent</span>
+          {% else %}
+            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Not Sent</span>
+          {% endif %}
+        </td>
+        <td>{{ record.email.received_at|date:"M d, Y H:i" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-center text-muted">No escalations found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
