@@ -2,7 +2,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponse
+from azure.storage.blob import BlobServiceClient
+from urllib.parse import urlparse, unquote
+import os
 
 from .models import EmailLog, COARecord, EscalationRecord
 from .serializers import EmailLogSerializer, COARecordSerializer, EscalationRecordSerializer
@@ -52,7 +56,7 @@ def dashboard(request):
 
 def emails_page(request):
     return render(request, "core/emails.html", {
-        "emails": EmailLog.objects.order_by("-received_at")
+        "emails": EmailLog.objects.order_by("received_at")
     })
 
 
@@ -72,3 +76,21 @@ def trigger_view(request):
     if request.method == "POST":
         check_and_process_emails.delay()
     return redirect("/dashboard/")
+
+
+def download_coa_pdf(request, record_id):
+    record = get_object_or_404(COARecord, id=record_id)
+
+    conn_str = os.getenv("AZURE_STORAGE_CONTAINER_STRING")
+    container = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
+    parsed = urlparse(record.pdf_url)
+    blob_name = unquote(parsed.path.split(f"/{container}/", 1)[-1])
+
+    blob_service = BlobServiceClient.from_connection_string(conn_str)
+    blob_client = blob_service.get_blob_client(container=container, blob=blob_name)
+
+    pdf_data = blob_client.download_blob().readall()
+
+    response = HttpResponse(pdf_data, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="COA_{record.lot_number or record.id}.pdf"'
+    return response

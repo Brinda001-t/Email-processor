@@ -1,7 +1,24 @@
 import imaplib
 import email as email_lib
 from email.header import decode_header
+from html.parser import HTMLParser
 import os
+
+
+class _HTMLStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.text = []
+    def handle_data(self, data):
+        self.text.append(data)
+    def get_text(self):
+        return " ".join(self.text)
+
+
+def _strip_html(html):
+    stripper = _HTMLStripper()
+    stripper.feed(html)
+    return stripper.get_text()
 
 
 class GmailService:
@@ -39,8 +56,18 @@ class GmailService:
                     if part.get_content_type() == "text/plain":
                         body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
                         break
+                if not body:
+                    for part in msg.walk():
+                        if part.get_content_type() == "text/html":
+                            html = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                            body = _strip_html(html)
+                            break
             else:
-                body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
+                payload = msg.get_payload(decode=True)
+                if payload:
+                    body = payload.decode("utf-8", errors="ignore")
+                    if msg.get_content_type() == "text/html":
+                        body = _strip_html(body)
 
             emails.append({
                 "id": uid.decode(),

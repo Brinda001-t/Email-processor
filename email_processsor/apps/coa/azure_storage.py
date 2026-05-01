@@ -10,7 +10,7 @@ def upload_to_azure(file_path):
 
     blob_service = BlobServiceClient.from_connection_string(conn_str)
 
-    original_name = file_path.split("/")[-1]
+    original_name = os.path.basename(file_path)
     blob_name = f"{uuid.uuid4()}_{original_name}"
 
     blob_client = blob_service.get_blob_client(

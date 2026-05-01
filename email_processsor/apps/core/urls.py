@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     EmailLogListView, COARecordListView, EscalationRecordListView, TriggerEmailProcessingView,
-    dashboard, emails_page, coa_page, escalations_page, trigger_view
+    dashboard, emails_page, coa_page, escalations_page, trigger_view, download_coa_pdf
 )
 
 urlpatterns = [
@@ -16,5 +16,6 @@ urlpatterns = [
     path("dashboard/emails/",       emails_page,       name="emails-page"),
     path("dashboard/coa/",          coa_page,          name="coa-page"),
     path("dashboard/escalations/",  escalations_page,  name="escalations-page"),
-    path("dashboard/trigger/",      trigger_view,      name="trigger-view"),
+    path("dashboard/trigger/",                  trigger_view,      name="trigger-view"),
+    path("dashboard/coa/<int:record_id>/download/", download_coa_pdf,  name="download-coa-pdf"),
 ]

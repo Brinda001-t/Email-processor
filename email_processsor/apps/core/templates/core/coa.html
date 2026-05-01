@@ -2,56 +2,70 @@
 {% block nav_coa %}active{% endblock %}
 
 {% block content %}
-<h4 class="fw-bold mb-4">COA Records</h4>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">COA Records</h4>
+    <p class="text-muted small mb-0">Certificate of Analysis records extracted from emails</p>
+  </div>
+  <span class="badge bg-primary fs-6 px-3 py-2">Total: {{ records|length }}</span>
+</div>
 
-<div class="card p-4">
-  <table class="table table-hover table-sm">
-    <thead class="table-light">
-      <tr>
-        <th>#</th>
-        <th>Company</th>
-        <th>Product</th>
-        <th>Lot Number</th>
-        <th>Lot Quantity</th>
-        <th>Manufacture Date</th>
-        <th>Expiration Date</th>
-        <th>Approved By</th>
-        <th>Status</th>
-        <th>PDF</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for record in records %}
-      <tr>
-        <td>{{ record.id }}</td>
-        <td>{{ record.company|default:"—" }}</td>
-        <td>{{ record.product_name|default:"—" }}</td>
-        <td>{{ record.lot_number|default:"—" }}</td>
-        <td>{{ record.lot_quantity|default:"—" }}</td>
-        <td>{{ record.manufacture_date|default:"—" }}</td>
-        <td>{{ record.expiration_date|default:"—" }}</td>
-        <td>{{ record.approved_by|default:"—" }}</td>
-        <td>
-          {% if record.status == "COMPLETED" %}
-            <span class="badge bg-success">COMPLETED</span>
-          {% else %}
-            <span class="badge bg-warning text-dark">{{ record.status }}</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if record.pdf_url %}
-            <a href="{{ record.pdf_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-              <i class="bi bi-file-pdf"></i> View
-            </a>
-          {% else %}
-            <span class="text-muted">—</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="10" class="text-center text-muted">No COA records found.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card" style="box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 10px;">
+  <div class="table-responsive">
+    <table class="table table-striped table-hover align-middle mb-0" style="font-size: 0.92rem;">
+      <thead style="background-color: #f1f3f5; position: sticky; top: 0; z-index: 1;">
+        <tr>
+          <th class="px-4 py-3 text-center" style="width: 60px;">S.No</th>
+          <th class="px-3 py-3" style="width: 130px;">Company</th>
+          <th class="px-3 py-3" style="width: 160px;">Product</th>
+          <th class="px-3 py-3" style="width: 150px;">Lot Number</th>
+          <th class="px-3 py-3 text-center" style="width: 110px;">Lot Quantity</th>
+          <th class="px-3 py-3 text-center" style="width: 130px;">Manufacture Date</th>
+          <th class="px-3 py-3 text-center" style="width: 120px;">Expiration Date</th>
+          <th class="px-3 py-3" style="width: 140px;">Approved By</th>
+          <th class="px-3 py-3 text-center" style="width: 110px;">Status</th>
+          <th class="px-3 py-3 text-center" style="width: 110px;">Download</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+        <tr>
+          <td class="px-4 py-3 text-center text-muted fw-semibold">{{ forloop.counter }}</td>
+          <td class="px-3 py-3 fw-medium">{{ record.company|default:"—" }}</td>
+          <td class="px-3 py-3">
+            <span style="display:block; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ record.product_name }}">
+              {{ record.product_name|default:"—" }}
+            </span>
+          </td>
+          <td class="px-3 py-3">{{ record.lot_number|default:"—" }}</td>
+          <td class="px-3 py-3 text-center">{{ record.lot_quantity|default:"—" }}</td>
+          <td class="px-3 py-3 text-center">{{ record.manufacture_date|default:"—" }}</td>
+          <td class="px-3 py-3 text-center">{{ record.expiration_date|default:"—" }}</td>
+          <td class="px-3 py-3">{{ record.approved_by|default:"—" }}</td>
+          <td class="px-3 py-3 text-center">
+            {% if record.status == "COMPLETED" %}
+              <span class="badge px-3 py-2" style="background-color:#198754; font-size:0.78rem;">COMPLETED</span>
+            {% else %}
+              <span class="badge px-3 py-2 bg-warning text-dark" style="font-size:0.78rem;">{{ record.status }}</span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-3 text-center">
+            {% if record.pdf_url %}
+              <a href="/dashboard/coa/{{ record.id }}/download/" class="btn btn-sm btn-success">
+                <i class="bi bi-download"></i> Download
+              </a>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10" class="text-center text-muted py-5">No COA records found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
