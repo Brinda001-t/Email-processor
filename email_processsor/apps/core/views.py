@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.core.paginator import Paginator
 from django.http import HttpResponse
 from azure.storage.blob import BlobServiceClient
 from urllib.parse import urlparse, unquote
@@ -45,18 +46,23 @@ class TriggerEmailProcessingView(APIView):
 # ─── UI Views ────────────────────────────────────────────────
 
 def dashboard(request):
+    all_emails = EmailLog.objects.order_by("-received_at")
+    paginator = Paginator(all_emails, 10)
+    page = request.GET.get("page", 1)
+    recent_emails = paginator.get_page(page)
+
     context = {
         "total_emails": EmailLog.objects.count(),
         "total_coa": COARecord.objects.count(),
         "total_escalations": EscalationRecord.objects.count(),
-        "recent_emails": EmailLog.objects.order_by("-received_at")[:10],
+        "recent_emails": recent_emails,
     }
     return render(request, "core/dashboard.html", context)
 
 
 def emails_page(request):
     return render(request, "core/emails.html", {
-        "emails": EmailLog.objects.order_by("received_at")
+        "emails": EmailLog.objects.order_by("-received_at")
     })
 
 

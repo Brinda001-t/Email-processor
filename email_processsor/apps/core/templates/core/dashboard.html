@@ -120,6 +120,42 @@
       </tbody>
     </table>
   </div>
+
+  <!-- Pagination -->
+  {% if recent_emails.has_other_pages %}
+  <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-top: 1px solid #f1f3f5;">
+    <small class="text-muted">
+      Showing {{ recent_emails.start_index }}–{{ recent_emails.end_index }} of {{ recent_emails.paginator.count }} emails
+    </small>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% if recent_emails.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ recent_emails.previous_page_number }}">← Prev</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">← Prev</span></li>
+        {% endif %}
+
+        {% for num in recent_emails.paginator.page_range %}
+          {% if recent_emails.number == num %}
+            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+          {% elif num >= recent_emails.number|add:"-2" and num <= recent_emails.number|add:"2" %}
+            <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+          {% endif %}
+        {% endfor %}
+
+        {% if recent_emails.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ recent_emails.next_page_number }}">Next →</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">Next →</span></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
 </div>
 
 {% endblock %}

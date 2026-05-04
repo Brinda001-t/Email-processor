@@ -20,6 +20,10 @@ class EmailLog(models.Model):
 
     classification = models.CharField(max_length=50, null=True, blank=True)
 
+    classification_tokens = models.IntegerField(null=True, blank=True)
+    extraction_tokens = models.IntegerField(null=True, blank=True)
+    total_tokens = models.IntegerField(null=True, blank=True)
+
     def __str__(self):
         return self.subject
 

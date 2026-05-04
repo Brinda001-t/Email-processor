@@ -44,12 +44,17 @@ def check_and_process_emails():
         # 🤖 Classify
         result = classify_email(body)
         log.classification = result["type"]
+        log.classification_tokens = result.get("tokens")
         log.save()
 
         # ---------------- COA FLOW ----------------
         if result["type"] == "COA":
 
             data = extract_coa_data(body)
+            extraction_tokens = data.pop("_tokens", None)
+            log.extraction_tokens = extraction_tokens
+            log.total_tokens = (log.classification_tokens or 0) + (extraction_tokens or 0)
+            log.save()
 
             coa = COARecord.objects.create(
                 email=log,
@@ -77,6 +82,8 @@ def check_and_process_emails():
 
         # ---------------- ESCALATION FLOW ----------------
         elif result["type"] == "ESCALATION":
+            log.total_tokens = log.classification_tokens or 0
+            log.save()
 
             escalation = EscalationRecord.objects.create(
                 email=log,
@@ -87,6 +94,11 @@ def check_and_process_emails():
             escalation.teams_sent = True
             escalation.save()
         
+        # ---------------- OTHER FLOW ----------------
+        else:
+            log.total_tokens = log.classification_tokens or 0
+            log.save()
+
         # mark processed
         log.status = "PROCESSED"
         log.save()

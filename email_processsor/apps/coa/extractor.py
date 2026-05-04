@@ -39,4 +39,6 @@ Document:
         content = content.split("```")[1]
         if content.startswith("json"):
             content = content[4:]
-    return json.loads(content.strip())
+    result = json.loads(content.strip())
+    result["_tokens"] = res.usage.total_tokens
+    return result
