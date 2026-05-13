@@ -1,17 +1,29 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.core.paginator import Paginator
-from django.http import HttpResponse
-from azure.storage.blob import BlobServiceClient
-from urllib.parse import urlparse, unquote
+import json
 import os
+from collections import defaultdict
+from urllib.parse import unquote, urlparse
 
-from .models import EmailLog, COARecord, EscalationRecord
-from .serializers import EmailLogSerializer, COARecordSerializer, EscalationRecordSerializer
+from azure.storage.blob import BlobServiceClient
+from django.core.paginator import Paginator
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .models import (
+    COARecord, EmailLog, EscalationRecord, OrderTrackingRecord,
+    OtherRecord, ReplyEmail, SkipLog,
+)
+from .serializers import (
+    COARecordSerializer, EmailLogSerializer, EscalationRecordSerializer,
+    ReplyEmailSerializer,
+)
 from .tasks import check_and_process_emails
+from apps.escalation.teams_notifier import send_teams_alert
 
 
 # ─── API Views ───────────────────────────────────────────────
@@ -23,16 +35,23 @@ class EmailLogListView(APIView):
         return Response(serializer.data)
 
 
+class ReplyEmailListView(APIView):
+    def get(self, request):
+        replies = ReplyEmail.objects.select_related("parent").order_by("-received_at")
+        serializer = ReplyEmailSerializer(replies, many=True)
+        return Response(serializer.data)
+
+
 class COARecordListView(APIView):
     def get(self, request):
-        records = COARecord.objects.select_related("email").order_by("-id")
+        records = COARecord.objects.select_related("email", "reply_email").order_by("-id")
         serializer = COARecordSerializer(records, many=True)
         return Response(serializer.data)
 
 
 class EscalationRecordListView(APIView):
     def get(self, request):
-        records = EscalationRecord.objects.select_related("email").order_by("-id")
+        records = EscalationRecord.objects.select_related("email", "reply_email").order_by("-id")
         serializer = EscalationRecordSerializer(records, many=True)
         return Response(serializer.data)
 
@@ -43,38 +62,128 @@ class TriggerEmailProcessingView(APIView):
         return Response({"message": "Email processing triggered."}, status=status.HTTP_202_ACCEPTED)
 
 
+# ─── Escalation action endpoints ─────────────────────────────
+
+@csrf_exempt
+@require_POST
+def resend_escalation(request, record_id):
+    record = get_object_or_404(EscalationRecord, id=record_id)
+    source = record.linked_email
+    if not source:
+        return JsonResponse({"error": "No linked email found"}, status=400)
+    alert_payload = {
+        "subject": source.subject,
+        "from": {"emailAddress": {"address": source.sender}},
+        "body": {"content": source.body},
+    }
+    sent, err = send_teams_alert(alert_payload, reason=record.reason, priority=record.priority)
+    record.teams_sent = sent
+    record.teams_error = "" if sent else err
+    record.save(update_fields=["teams_sent", "teams_error"])
+    if sent:
+        return JsonResponse({"status": "ok"})
+    return JsonResponse({"status": "error", "error": err}, status=502)
+
+
+# ─── Other record action endpoints ───────────────────────────
+
+@csrf_exempt
+@require_POST
+def reclassify_other(request, record_id):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    new_type = data.get("reclassified_as", "").strip()
+    if not new_type:
+        return JsonResponse({"error": "reclassified_as is required"}, status=400)
+    record = get_object_or_404(OtherRecord, id=record_id)
+    record.reclassified_as = new_type
+    record.review_status = "REVIEWED"
+    record.review_notes = data.get("notes", "")
+    record.save(update_fields=["reclassified_as", "review_status", "review_notes"])
+    return JsonResponse({"status": "ok"})
+
+
 # ─── UI Views ────────────────────────────────────────────────
 
 def dashboard(request):
     all_emails = EmailLog.objects.order_by("-received_at")
+
     paginator = Paginator(all_emails, 10)
     page = request.GET.get("page", 1)
     recent_emails = paginator.get_page(page)
 
     context = {
-        "total_emails": EmailLog.objects.count(),
-        "total_coa": COARecord.objects.count(),
+        "total_emails": EmailLog.objects.count() + ReplyEmail.objects.count(),
+        "total_coa": COARecord.objects.filter(is_current=True).count(),
         "total_escalations": EscalationRecord.objects.count(),
+        "total_orders": OrderTrackingRecord.objects.count(),
+        "pending_orders": OrderTrackingRecord.objects.filter(status="PENDING").count(),
+        "total_skipped": SkipLog.objects.count(),
+        "total_others": OtherRecord.objects.count(),
+        "pending_others": OtherRecord.objects.filter(review_status="PENDING").count(),
         "recent_emails": recent_emails,
     }
     return render(request, "core/dashboard.html", context)
 
 
 def emails_page(request):
-    return render(request, "core/emails.html", {
-        "emails": EmailLog.objects.order_by("-received_at")
-    })
+    emails = list(EmailLog.objects.order_by("-received_at"))
+
+    reply_counts = defaultdict(int)
+    for r in ReplyEmail.objects.values_list("thread_id", flat=True):
+        if r:
+            reply_counts[r] += 1
+
+    for e in emails:
+        e.thread_size = 1 + reply_counts.get(e.thread_id, 0) if e.thread_id else 1
+        e.is_thread_root = True
+        e.is_reply = False
+        e.parent_email = None
+
+    return render(request, "core/emails.html", {"emails": emails})
 
 
 def coa_page(request):
+    show_all = request.GET.get("show_all") == "1"
+    qs = COARecord.objects.select_related(
+        "email", "reply_email", "parent_record"
+    ).order_by("-id")
+    if not show_all:
+        qs = qs.filter(is_current=True)
     return render(request, "core/coa.html", {
-        "records": COARecord.objects.select_related("email").order_by("-id")
+        "records": qs,
+        "show_all": show_all,
     })
 
 
 def escalations_page(request):
     return render(request, "core/escalations.html", {
-        "records": EscalationRecord.objects.select_related("email").order_by("-id")
+        "records": EscalationRecord.objects.select_related("email", "reply_email").order_by("-id"),
+    })
+
+
+def orders_page(request):
+    return render(request, "core/orders.html", {
+        "records": OrderTrackingRecord.objects.select_related("email", "reply_email").order_by("-id")
+    })
+
+
+def skip_log_page(request):
+    return render(request, "core/skip_log.html", {
+        "records": SkipLog.objects.order_by("-skipped_at")
+    })
+
+
+def others_page(request):
+    review_filter = request.GET.get("review", "")
+    qs = OtherRecord.objects.select_related("email", "reply_email").order_by("-created_at")
+    if review_filter:
+        qs = qs.filter(review_status=review_filter)
+    return render(request, "core/others.html", {
+        "records": qs,
+        "review_filter": review_filter,
     })
 
 

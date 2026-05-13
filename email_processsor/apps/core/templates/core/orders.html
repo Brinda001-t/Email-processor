@@ -1,0 +1,92 @@
+{% extends "core/base.html" %}
+{% load email_filters %}
+{% block nav_orders %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">Order Tracking</h4>
+    <p class="text-muted small mb-0">Incoming order inquiries — auto-replied from order database</p>
+  </div>
+  <span class="badge fs-6 px-3 py-2" style="background-color:#fd7e14;">Total: {{ records|length }}</span>
+</div>
+
+<div class="card" style="box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 10px;">
+  <div class="table-responsive">
+    <table class="table table-striped table-hover align-middle mb-0" style="font-size: 0.92rem;">
+      <thead style="background-color: #f1f3f5; position: sticky; top: 0; z-index: 1;">
+        <tr>
+          <th class="px-3 py-3" style="width: 240px;">Subject</th>
+          <th class="px-3 py-3" style="width: 200px;">Sender</th>
+          <th class="px-3 py-3 text-center" style="width: 130px;">Order No.</th>
+          <th class="px-3 py-3 text-center" style="width: 130px;">Type</th>
+          <th class="px-3 py-3 text-center" style="width: 130px;">Auto-Reply</th>
+          <th class="px-3 py-3 text-center" style="width: 160px;">Received</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+        <tr>
+          <td class="px-3 py-3">
+            <span class="fw-medium d-block text-truncate" style="max-width:230px;"
+                  title="{{ record.linked_email.subject }}">
+              {{ record.linked_email.subject|default:"(no subject)" }}
+            </span>
+          </td>
+          <td class="px-3 py-3">
+            <span class="text-muted small d-block text-truncate" style="max-width:195px;"
+                  title="{{ record.linked_email.sender|email_only }}">
+              {{ record.linked_email.sender|email_only }}
+            </span>
+          </td>
+          <td class="px-3 py-3 text-center">
+            {% if record.order_number %}
+              <span class="badge bg-secondary px-2 py-1" style="font-size:0.75rem;">
+                {{ record.order_number }}
+              </span>
+            {% else %}
+              <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-3 text-center">
+            {% with subtype=record.linked_email.email_subtype %}
+              {% if subtype == "driver_status" %}
+                <span class="badge px-2 py-1" style="background-color:#0dcaf0; color:#000; font-size:0.75rem;">Driver Status</span>
+              {% elif subtype == "status_check" %}
+                <span class="badge px-2 py-1" style="background-color:#6f42c1; font-size:0.75rem;">Status Check</span>
+              {% elif subtype == "new_order" %}
+                <span class="badge px-2 py-1" style="background-color:#fd7e14; font-size:0.75rem;">New Order</span>
+              {% else %}
+                <span class="badge bg-secondary px-2 py-1" style="font-size:0.75rem;">{{ subtype|default:"—" }}</span>
+              {% endif %}
+            {% endwith %}
+          </td>
+          <td class="px-3 py-3 text-center">
+            {% if record.status == "RESOLVED" %}
+              <span class="badge px-2 py-1" style="background-color:#198754; font-size:0.75rem;">
+                <i class="bi bi-check-circle me-1"></i>Sent
+              </span>
+              {% if record.resolved_at %}
+                <div class="text-muted" style="font-size:0.72rem;">{{ record.resolved_at|date:"d M H:i" }}</div>
+              {% endif %}
+            {% else %}
+              <span class="badge bg-warning text-dark px-2 py-1" style="font-size:0.75rem;">
+                <i class="bi bi-hourglass-split me-1"></i>Pending
+              </span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-3 text-center text-muted small">
+            {{ record.linked_email.received_at|date:"d M Y" }}<br>
+            <span style="font-size:0.78rem;">{{ record.linked_email.received_at|date:"H:i" }}</span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-5">No order records found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

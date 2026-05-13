@@ -162,7 +162,15 @@ CELERY_BEAT_SCHEDULE = {
     "check-emails-every-5-min": {
         "task": "apps.core.tasks.check_and_process_emails",
         "schedule": 300.0,
-    }
+    },
+    "escalate-unattended-emails-every-15-min": {
+        "task": "apps.core.tasks.escalate_unattended_emails",
+        "schedule": 900.0,
+    },
+    "check-other-volume-spike-every-15-min": {
+        "task": "apps.core.tasks.check_other_volume_spike",
+        "schedule": 900.0,
+    },
 }
 
 

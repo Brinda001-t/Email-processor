@@ -12,10 +12,12 @@
     .sidebar .nav-link { color: #adb5bd; }
     .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: #343a40; border-radius: 6px; }
     .sidebar .brand { color: #fff; font-size: 1.2rem; font-weight: 600; }
+    .sidebar .nav-section { color: #6c757d; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.5rem 0.75rem 0.25rem; }
     .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-    .badge-coa { background-color: #0d6efd; }
+    .badge-coa     { background-color: #0d6efd; }
+    .badge-order   { background-color: #fd7e14; }
     .badge-escalation { background-color: #dc3545; }
-    .badge-other { background-color: #6c757d; }
+    .badge-other   { background-color: #6c757d; }
   </style>
 </head>
 <body>
@@ -26,9 +28,14 @@
       <div class="brand mb-4 px-2"><i class="bi bi-envelope-fill me-2"></i>Email Flow</div>
       <nav class="nav flex-column gap-1">
         <a href="/dashboard/" class="nav-link {% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+        <div class="nav-section mt-2">Processing</div>
         <a href="/dashboard/emails/" class="nav-link {% block nav_emails %}{% endblock %}"><i class="bi bi-envelope me-2"></i>Emails</a>
         <a href="/dashboard/coa/" class="nav-link {% block nav_coa %}{% endblock %}"><i class="bi bi-file-earmark-text me-2"></i>COA Records</a>
+        <a href="/dashboard/orders/" class="nav-link {% block nav_orders %}{% endblock %}"><i class="bi bi-bag-check me-2"></i>Orders</a>
         <a href="/dashboard/escalations/" class="nav-link {% block nav_escalations %}{% endblock %}"><i class="bi bi-exclamation-triangle me-2"></i>Escalations</a>
+        <a href="/dashboard/others/" class="nav-link {% block nav_others %}{% endblock %}"><i class="bi bi-question-circle me-2"></i>Others</a>
+        <div class="nav-section mt-2">System</div>
+        <a href="/dashboard/skip-log/" class="nav-link {% block nav_skiplog %}{% endblock %}"><i class="bi bi-slash-circle me-2"></i>Skip Log</a>
       </nav>
     </div>
 

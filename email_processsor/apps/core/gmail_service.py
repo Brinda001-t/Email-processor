@@ -1,8 +1,10 @@
 import imaplib
 import email as email_lib
 from email.header import decode_header
+from email.utils import parseaddr
 from html.parser import HTMLParser
 import os
+import re
 
 
 class _HTMLStripper(HTMLParser):
@@ -43,12 +45,21 @@ class GmailService:
 
         emails = []
         for uid in uids[0].split():
-            _, msg_data = self.mail.uid("fetch", uid, "(RFC822)")
+            _, msg_data = self.mail.uid("fetch", uid, "(X-GM-THRID RFC822)")
+            header_part = msg_data[0][0]
+            thread_match = re.search(rb'X-GM-THRID\s+(\d+)', header_part)
+            thread_id = thread_match.group(1).decode() if thread_match else None
+
             raw = msg_data[0][1]
             msg = email_lib.message_from_bytes(raw)
 
             subject = self._decode_str(msg.get("Subject", ""))
-            sender = msg.get("From", "")
+
+            # Bug 1 fix: extract clean email address from "Name <email>" format
+            raw_from = msg.get("From", "")
+            _, sender = parseaddr(raw_from)
+            if not sender:
+                sender = raw_from
 
             body = ""
             if msg.is_multipart():
@@ -69,14 +80,42 @@ class GmailService:
                     if msg.get_content_type() == "text/html":
                         body = _strip_html(body)
 
+            headers = {}
+            for h in ("List-Unsubscribe", "Precedence", "X-Mailer", "X-Campaign-Id"):
+                val = msg.get(h)
+                if val:
+                    headers[h.lower()] = val
+
+            rfc_message_id = (msg.get("Message-ID") or "").strip()
+            in_reply_to = (msg.get("In-Reply-To") or "").strip()
+
             emails.append({
                 "id": uid.decode(),
                 "subject": subject,
                 "from": {"emailAddress": {"address": sender}},
                 "body": {"content": body},
+                "headers": headers,
+                "rfc_message_id": rfc_message_id or None,
+                "in_reply_to": in_reply_to or None,
+                "thread_id": thread_id,
             })
 
         return emails
 
     def mark_as_read(self, uid):
         self.mail.uid("store", uid.encode(), "+FLAGS", "\\Seen")
+
+    def send_email(self, to_address, subject, body):
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        msg = MIMEMultipart()
+        msg["From"] = os.getenv("GMAIL_EMAIL")
+        msg["To"] = to_address
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(os.getenv("GMAIL_EMAIL"), os.getenv("GMAIL_APP_PASSWORD"))
+            server.send_message(msg)

@@ -1,10 +1,16 @@
 from rest_framework import serializers
-from .models import EmailLog, COARecord, EscalationRecord
+from .models import EmailLog, ReplyEmail, COARecord, EscalationRecord
 
 
 class EmailLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailLog
+        fields = "__all__"
+
+
+class ReplyEmailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReplyEmail
         fields = "__all__"
 
 

@@ -1,4 +1,5 @@
 {% extends "core/base.html" %}
+{% load email_filters %}
 {% block nav_emails %}active{% endblock %}
 
 {% block content %}
@@ -17,49 +18,72 @@
         <tr>
           <th class="px-3 py-3" style="width: 250px;">Subject</th>
           <th class="px-3 py-3" style="width: 220px;">Sender</th>
-          <th class="px-3 py-3 text-center" style="width: 130px;">Classification</th>
+          <th class="px-3 py-3 text-center" style="width: 130px;">Type</th>
+          <th class="px-3 py-3 text-center" style="width: 120px;">Subtype</th>
           <th class="px-3 py-3 text-center" style="width: 110px;">Status</th>
-          <th class="px-3 py-3 text-center" style="width: 120px;">Date</th>
-          <th class="px-3 py-3 text-center" style="width: 80px;">Time</th>
+          <th class="px-3 py-3 text-center" style="width: 150px;">Received</th>
         </tr>
       </thead>
       <tbody>
         {% for email in emails %}
         <tr>
           <td class="px-3 py-3">
-            <span class="fw-medium" style="display: block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ email.subject }}">
-              {{ email.subject|default:"(no subject)" }}
-            </span>
+            {% if email.is_reply %}
+              <div style="border-left: 3px solid #0d6efd; padding-left: 8px;">
+                <span class="badge me-1" style="background:#e8f0fe; color:#0d6efd; font-size:0.65rem; border:1px solid #c2d4f8;">↳ Reply</span>
+                {% if email.parent_email %}
+                  <small class="text-muted" style="font-size:0.7rem; display:block; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="Re: {{ email.parent_email.subject }}">
+                    Re: {{ email.parent_email.subject|default:"(no subject)" }}
+                  </small>
+                {% endif %}
+                <span class="fw-medium" style="display:block; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ email.subject }}">
+                  {{ email.subject|default:"(no subject)" }}
+                </span>
+              </div>
+            {% else %}
+              <span class="fw-medium" style="display:block; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ email.subject }}">
+                {{ email.subject|default:"(no subject)" }}
+              </span>
+              {% if email.thread_size > 1 %}
+                <span class="badge mt-1" style="background:#e8f0fe; color:#0d6efd; font-size:0.65rem; border:1px solid #c2d4f8;">
+                  Thread &middot; {{ email.thread_size }} emails
+                </span>
+              {% endif %}
+            {% endif %}
           </td>
           <td class="px-3 py-3">
-            <span class="text-muted small" style="display: block; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ email.sender }}">
-              {{ email.sender }}
+            <span class="text-muted small" style="display: block; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ email.sender|email_only }}">
+              {{ email.sender|email_only }}
             </span>
           </td>
           <td class="px-3 py-3 text-center">
             {% if email.classification == "COA" %}
-              <span class="badge px-3 py-2" style="background-color:#0d6efd; font-size:0.78rem;">COA</span>
+              <span class="badge px-2 py-1" style="background-color:#0d6efd; font-size:0.75rem;">COA</span>
+            {% elif email.classification == "ORDER" %}
+              <span class="badge px-2 py-1" style="background-color:#fd7e14; font-size:0.75rem;">ORDER</span>
             {% elif email.classification == "ESCALATION" %}
-              <span class="badge px-3 py-2" style="background-color:#dc3545; font-size:0.78rem;">ESCALATION</span>
+              <span class="badge px-2 py-1" style="background-color:#dc3545; font-size:0.75rem;">ESCALATION</span>
             {% else %}
-              <span class="badge px-3 py-2 bg-secondary" style="font-size:0.78rem;">{{ email.classification|default:"—" }}</span>
+              <span class="badge px-2 py-1 bg-secondary" style="font-size:0.75rem;">{{ email.classification|default:"—" }}</span>
             {% endif %}
           </td>
           <td class="px-3 py-3 text-center">
+            <span class="text-muted small">{{ email.email_subtype|default:"—" }}</span>
+          </td>
+          <td class="px-3 py-3 text-center">
             {% if email.status == "PROCESSED" %}
-              <span class="badge px-3 py-2" style="background-color:#198754; font-size:0.78rem;">PROCESSED</span>
+              <span class="badge px-2 py-1" style="background-color:#198754; font-size:0.75rem;">PROCESSED</span>
             {% elif email.status == "FAILED" %}
-              <span class="badge px-3 py-2 bg-danger" style="font-size:0.78rem;">FAILED</span>
+              <span class="badge px-2 py-1 bg-danger" style="font-size:0.75rem;">FAILED</span>
             {% else %}
-              <span class="badge px-3 py-2 bg-warning text-dark" style="font-size:0.78rem;">{{ email.status }}</span>
+              <span class="badge px-2 py-1 bg-warning text-dark" style="font-size:0.75rem;">{{ email.status }}</span>
             {% endif %}
           </td>
-          <td class="px-3 py-3 text-center text-muted small">{{ email.received_at|date:"d M Y" }}</td>
-          <td class="px-3 py-3 text-center text-muted small">{{ email.received_at|date:"H:i" }}</td>
+          <td class="px-3 py-3 text-center text-muted small">{{ email.received_at|date:"d M Y H:i" }}</td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center text-muted py-5">No emails found.</td>
+          <td colspan="6" class="text-center text-muted py-5">No emails found.</td>
         </tr>
         {% endfor %}
       </tbody>
