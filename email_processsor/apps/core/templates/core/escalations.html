@@ -18,10 +18,10 @@
         <tr>
           <th class="px-3 py-3">Subject</th>
           <th class="px-3 py-3">Sender</th>
-          <th class="px-3 py-3">Reason</th>
           <th class="px-3 py-3 text-center">Priority</th>
           <th class="px-3 py-3 text-center">Teams Alert</th>
-          <th class="px-3 py-3 text-center">Date</th>
+          <th class="px-3 py-3 text-center">Received</th>
+          <th class="px-3 py-3 text-center">Escalated At</th>
         </tr>
       </thead>
       <tbody>
@@ -37,12 +37,6 @@
             <span class="text-muted small d-block text-truncate" style="max-width:180px;"
                   title="{{ record.linked_email.sender|email_only }}">
               {{ record.linked_email.sender|email_only }}
-            </span>
-          </td>
-          <td class="px-3 py-3">
-            <span class="d-block text-truncate" style="max-width:240px; color:#495057;"
-                  title="{{ record.reason }}">
-              {{ record.reason }}
             </span>
           </td>
           <td class="px-3 py-3 text-center">
@@ -69,6 +63,14 @@
           <td class="px-3 py-3 text-center text-muted small">
             {{ record.linked_email.received_at|date:"d M Y" }}<br>
             <span style="font-size:0.78rem;">{{ record.linked_email.received_at|date:"H:i" }}</span>
+          </td>
+          <td class="px-3 py-3 text-center text-muted small">
+            {% if record.created_at %}
+              {{ record.created_at|date:"d M Y" }}<br>
+              <span style="font-size:0.78rem;">{{ record.created_at|date:"H:i" }}</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
           </td>
         </tr>
         {% empty %}

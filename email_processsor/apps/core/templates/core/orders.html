@@ -20,7 +20,7 @@
           <th class="px-3 py-3" style="width: 200px;">Sender</th>
           <th class="px-3 py-3 text-center" style="width: 130px;">Order No.</th>
           <th class="px-3 py-3 text-center" style="width: 130px;">Type</th>
-          <th class="px-3 py-3 text-center" style="width: 130px;">Auto-Reply</th>
+          <th class="px-3 py-3 text-center" style="width: 130px;">Status</th>
           <th class="px-3 py-3 text-center" style="width: 160px;">Received</th>
         </tr>
       </thead>
@@ -64,7 +64,7 @@
           <td class="px-3 py-3 text-center">
             {% if record.status == "RESOLVED" %}
               <span class="badge px-2 py-1" style="background-color:#198754; font-size:0.75rem;">
-                <i class="bi bi-check-circle me-1"></i>Sent
+                <i class="bi bi-check-circle me-1"></i>Resolved
               </span>
               {% if record.resolved_at %}
                 <div class="text-muted" style="font-size:0.72rem;">{{ record.resolved_at|date:"d M H:i" }}</div>

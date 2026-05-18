@@ -2,9 +2,8 @@ from django.urls import path
 from .views import (
     EmailLogListView, COARecordListView, EscalationRecordListView, TriggerEmailProcessingView,
     dashboard, emails_page, coa_page, escalations_page, orders_page, skip_log_page,
-    others_page, trigger_view, download_coa_pdf,
+    trigger_view, download_coa_pdf,
     resend_escalation,
-    reclassify_other,
 )
 
 urlpatterns = [
@@ -17,17 +16,13 @@ urlpatterns = [
     # Escalation actions
     path("api/escalations/<int:record_id>/resend/", resend_escalation, name="resend-escalation"),
 
-    # Other actions
-    path("api/others/<int:record_id>/reclassify/", reclassify_other, name="reclassify-other"),
-
     # UI
     path("dashboard/",                              dashboard,         name="dashboard"),
     path("dashboard/emails/",                       emails_page,       name="emails-page"),
     path("dashboard/coa/",                          coa_page,          name="coa-page"),
     path("dashboard/escalations/",                  escalations_page,  name="escalations-page"),
     path("dashboard/orders/",                       orders_page,       name="orders-page"),
-    path("dashboard/skip-log/",                     skip_log_page,     name="skip-log-page"),
-    path("dashboard/others/",                       others_page,       name="others-page"),
+    path("dashboard/skip-log/",                      skip_log_page,     name="skip-log-page"),
     path("dashboard/trigger/",                      trigger_view,      name="trigger-view"),
     path("dashboard/coa/<int:record_id>/download/", download_coa_pdf,  name="download-coa-pdf"),
 ]

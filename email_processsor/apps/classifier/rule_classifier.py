@@ -16,7 +16,7 @@ _ORDER_SUBJECT = re.compile(
     re.IGNORECASE,
 )
 _ESCALATION_SUBJECT = re.compile(
-    r"\b(urgent|critical|escalation|escalate|failed|failure|wrong[\s_-]*delivery|quality[\s_-]*failure|complaint|recall|rejected|rejection)\b",
+    r"\b(urgent|critical|failed|failure|wrong[\s_-]*delivery|quality[\s_-]*failure|complaint|recall|rejected|rejection)\b",
     re.IGNORECASE,
 )
 

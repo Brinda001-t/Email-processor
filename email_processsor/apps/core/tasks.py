@@ -1,5 +1,6 @@
 import logging
 import datetime
+import os
 import re
 
 from celery import shared_task
@@ -8,7 +9,7 @@ from django.utils import timezone
 
 from .models import (
     EmailLog, ReplyEmail, COARecord, EscalationRecord,
-    OrderTrackingRecord, SkipLog, OtherRecord,
+    OrderTrackingRecord, SkipLog,
 )
 from .gmail_service import GmailService
 from .db_service import get_order_status, get_driver_status
@@ -23,8 +24,13 @@ logger = logging.getLogger(__name__)
 
 # Minutes unresponded before HIGH priority escalation
 PRIORITY_HIGH_MINUTES = 60
-# OTHER spike: alert if this many OTHER emails arrive within one hour
-OTHER_SPIKE_THRESHOLD = 10
+
+_COMPARABLE_FIELDS = [
+    "company", "address", "contact_phone", "contact_email",
+    "product_name", "part_number", "lot_number", "lot_quantity",
+    "manufacture_date", "expiration_date", "report_date",
+    "approved_by", "test_results",
+]
 
 _ORDER_NUMBER_RE = re.compile(
     r'\b(?:order|po|purchase[\s_-]*order|p\.o\.?)[\s#:.-]*([A-Z0-9][A-Z0-9-]{2,18})',
@@ -160,13 +166,6 @@ def check_and_process_emails():
                 company = data.get("company")
                 tid = log.thread_id
 
-                _COMPARABLE_FIELDS = [
-                    "company", "address", "contact_phone", "contact_email",
-                    "product_name", "part_number", "lot_number", "lot_quantity",
-                    "manufacture_date", "expiration_date", "report_date",
-                    "approved_by", "test_results",
-                ]
-
                 with transaction.atomic():
                     existing = None
 
@@ -244,6 +243,7 @@ def check_and_process_emails():
 
                     pdf_path = generate_pdf(merged)
                     url = upload_to_azure(pdf_path)
+                    os.remove(pdf_path)
                     coa.pdf_url = url
                     coa.status = "COMPLETED"
                     coa.save()
@@ -255,7 +255,7 @@ def check_and_process_emails():
 
                 subtype = result.get("subtype", "status_check")
 
-                order_number = _extract_order_number(subject + " " + body)
+                order_number = result.get("order_number") or _extract_order_number(subject + " " + body)
 
                 order_record, _ = OrderTrackingRecord.objects.get_or_create(
                     **_email_fk(),
@@ -335,17 +335,10 @@ def check_and_process_emails():
                 log.total_tokens = log.classification_tokens or 0
                 log.save()
 
-                subtype = result.get("subtype", "general")
-                if subtype in ("spam", "marketing"):
-                    # Leave unread in Gmail, no record created
-                    mark_read = False
-                else:
-                    OtherRecord.objects.get_or_create(**_email_fk())
-
             log.status = "PROCESSED"
             log.save()
             if result["type"] == "ESCALATION":
-                send_escalation_alert.apply_async(args=[log.id], countdown=3600)
+                send_escalation_alert.apply_async(args=[log.id], countdown=PRIORITY_HIGH_MINUTES * 60)
             if mark_read:
                 gmail.mark_as_read(message_id)
 
@@ -371,10 +364,6 @@ def send_escalation_alert(email_log_id):
     elif classification == "ORDER":
         if OrderTrackingRecord.objects.filter(email=log, status="RESOLVED").exists():
             return
-    elif classification == "OTHER":
-        if OtherRecord.objects.filter(email=log, review_status="REVIEWED").exists():
-            return
-
     if EscalationRecord.objects.filter(email=log).exists():
         return
 
@@ -420,7 +409,7 @@ def escalate_unattended_emails():
         if EscalationRecord.objects.filter(email=log).exists():
             continue
 
-        reason = f"Email unattended for {int(elapsed_minutes)} minutes (type: {classification or 'UNKNOWN'})"
+        reason = f"Email unattended for {int(elapsed_minutes)} minutes (type: {log.classification or 'UNKNOWN'})"
         record = EscalationRecord.objects.create(
             email=log,
             priority="HIGH",
@@ -447,23 +436,3 @@ def escalate_unattended_emails():
         )
 
 
-@shared_task
-def check_other_volume_spike():
-    """Alert Teams if OTHER-classified emails spike above threshold in the last hour."""
-    one_hour_ago = timezone.now() - datetime.timedelta(hours=1)
-    recent_count = OtherRecord.objects.filter(created_at__gte=one_hour_ago).count()
-
-    if recent_count >= OTHER_SPIKE_THRESHOLD:
-        alert_payload = {
-            "subject": "[ALERT] OTHER email spike detected",
-            "from": {"emailAddress": {"address": "system@emailflow"}},
-            "body": {"content": (
-                f"{recent_count} emails classified as OTHER in the last hour. "
-                f"The classifier may be misfiring. Please review the Others page."
-            )},
-        }
-        send_teams_alert(
-            alert_payload,
-            reason=f"OTHER volume spike: {recent_count} emails in last hour (threshold: {OTHER_SPIKE_THRESHOLD})",
-        )
-        logger.warning("OTHER volume spike alert sent: %d emails in last hour", recent_count)

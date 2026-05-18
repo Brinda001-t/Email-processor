@@ -183,32 +183,3 @@ class OrderTrackingRecord(models.Model):
         return self.email or self.reply_email
 
 
-_OTHER_REVIEW_CHOICES = [
-    ("PENDING", "Pending"),
-    ("REVIEWED", "Reviewed"),
-]
-
-
-class OtherRecord(models.Model):
-    email = models.OneToOneField(
-        EmailLog, null=True, blank=True, on_delete=models.CASCADE
-    )
-    reply_email = models.OneToOneField(
-        ReplyEmail, null=True, blank=True, on_delete=models.CASCADE
-    )
-    review_status = models.CharField(
-        max_length=20, choices=_OTHER_REVIEW_CHOICES, default="PENDING"
-    )
-    reclassified_as = models.CharField(max_length=50, null=True, blank=True)
-    review_notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["review_status"]),
-        ]
-
-    @property
-    def linked_email(self):
-        return self.email or self.reply_email

@@ -10,84 +10,76 @@
     <h4 class="fw-bold mb-0">Dashboard</h4>
     <p class="text-muted small mb-0">Real-time overview of email processing activity</p>
   </div>
-  <form method="post" action="/dashboard/trigger/">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-primary px-4">
-      <i class="bi bi-arrow-clockwise me-2"></i>Trigger Email Processing
-    </button>
-  </form>
-</div>
-
-<!-- Stats Row 1 -->
-<div class="row g-3 mb-3">
-  <div class="col-md-3">
+  <div class="d-flex align-items-center gap-3">
     <a href="/dashboard/emails/" class="text-decoration-none">
-      <div class="card h-100 px-4 py-3" style="border-left: 4px solid #0d6efd; border-radius:10px;">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <div class="text-muted small mb-1">Total Emails</div>
-            <div class="fs-1 fw-bold text-primary">{{ total_emails }}</div>
-          </div>
-          <i class="bi bi-envelope-fill fs-1 text-primary opacity-25"></i>
-        </div>
+      <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:#e8f0fe; border:1px solid #c2d4f8;">
+        <i class="bi bi-envelope-fill text-primary"></i>
+        <span class="fw-bold text-primary">{{ total_emails }}</span>
+        <span class="text-muted small">Total Emails</span>
       </div>
     </a>
+    <form method="post" action="/dashboard/trigger/">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="bi bi-arrow-clockwise me-2"></i>Trigger Email Processing
+      </button>
+    </form>
   </div>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4">
   <div class="col-md-3">
     <a href="/dashboard/coa/" class="text-decoration-none">
-      <div class="card h-100 px-4 py-3" style="border-left: 4px solid #198754; border-radius:10px;">
+      <div class="card h-100 px-3 py-2" style="border-left: 4px solid #198754; border-radius:10px;">
         <div class="d-flex justify-content-between align-items-center">
           <div>
-            <div class="text-muted small mb-1">COA Records (current)</div>
-            <div class="fs-1 fw-bold text-success">{{ total_coa }}</div>
+            <div class="text-muted small mb-1">COA Records</div>
+            <div class="fs-4 fw-bold text-success">{{ total_coa }}</div>
           </div>
-          <i class="bi bi-file-earmark-text-fill fs-1 text-success opacity-25"></i>
+          <i class="bi bi-file-earmark-text-fill fs-3 text-success opacity-25"></i>
         </div>
       </div>
     </a>
   </div>
   <div class="col-md-3">
     <a href="/dashboard/orders/" class="text-decoration-none">
-      <div class="card h-100 px-4 py-3" style="border-left: 4px solid #fd7e14; border-radius:10px;">
+      <div class="card h-100 px-3 py-2" style="border-left: 4px solid #fd7e14; border-radius:10px;">
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <div class="text-muted small mb-1">Orders</div>
-            <div class="fs-1 fw-bold" style="color:#fd7e14;">{{ total_orders }}</div>
+            <div class="fs-4 fw-bold" style="color:#fd7e14;">{{ total_orders }}</div>
             <div class="small mt-1">
               <span class="text-warning fw-semibold">{{ pending_orders }} pending</span>
             </div>
           </div>
-          <i class="bi bi-bag-check-fill fs-1 opacity-25" style="color:#fd7e14;"></i>
+          <i class="bi bi-bag-check-fill fs-3 opacity-25" style="color:#fd7e14;"></i>
         </div>
       </div>
     </a>
   </div>
   <div class="col-md-3">
     <a href="/dashboard/escalations/" class="text-decoration-none">
-      <div class="card h-100 px-4 py-3" style="border-left: 4px solid #dc3545; border-radius:10px;">
+      <div class="card h-100 px-3 py-2" style="border-left: 4px solid #dc3545; border-radius:10px;">
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <div class="text-muted small mb-1">Escalations</div>
-            <div class="fs-1 fw-bold text-danger">{{ total_escalations }}</div>
+            <div class="fs-4 fw-bold text-danger">{{ total_escalations }}</div>
           </div>
-          <i class="bi bi-exclamation-triangle-fill fs-1 text-danger opacity-25"></i>
+          <i class="bi bi-exclamation-triangle-fill fs-3 text-danger opacity-25"></i>
         </div>
       </div>
     </a>
   </div>
-</div>
-
-<!-- Skipped row -->
-<div class="row g-3 mb-4">
   <div class="col-md-3">
     <a href="/dashboard/skip-log/" class="text-decoration-none">
-      <div class="card h-100 px-4 py-3" style="border-left: 4px solid #6c757d; border-radius:10px;">
+      <div class="card h-100 px-3 py-2" style="border-left: 4px solid #6c757d; border-radius:10px;">
         <div class="d-flex justify-content-between align-items-center">
           <div>
-            <div class="text-muted small mb-1">Skipped (spam / marketing)</div>
-            <div class="fs-1 fw-bold text-secondary">{{ total_skipped }}</div>
+            <div class="text-muted small mb-1">Spam / Skipped</div>
+            <div class="fs-4 fw-bold text-secondary">{{ total_skipped }}</div>
           </div>
-          <i class="bi bi-slash-circle-fill fs-1 text-secondary opacity-25"></i>
+          <i class="bi bi-slash-circle-fill fs-3 text-secondary opacity-25"></i>
         </div>
       </div>
     </a>
@@ -106,7 +98,7 @@
         <tr>
           <th class="px-4 py-3" style="width:240px;">Subject</th>
           <th class="px-3 py-3" style="width:200px;">Sender</th>
-          <th class="px-3 py-3 text-center" style="width:160px;">Type / Subtype</th>
+          <th class="px-3 py-3 text-center" style="width:160px;">Type</th>
           <th class="px-3 py-3 text-center" style="width:120px;">Status</th>
           <th class="px-3 py-3 text-center" style="width:120px;">Date</th>
         </tr>
@@ -133,9 +125,6 @@
               <span class="badge px-2 py-1" style="background-color:#dc3545; font-size:0.75rem;">ESCALATION</span>
             {% else %}
               <span class="badge px-2 py-1 bg-secondary" style="font-size:0.75rem;">{{ email.classification|default:"—" }}</span>
-            {% endif %}
-            {% if email.email_subtype %}
-              <div class="text-muted" style="font-size:0.7rem; margin-top:2px;">{{ email.email_subtype }}</div>
             {% endif %}
           </td>
           <td class="px-3 py-3 text-center">

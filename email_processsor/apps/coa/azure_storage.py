@@ -1,6 +1,6 @@
 from azure.storage.blob import BlobServiceClient
+from pathlib import Path
 import os
-import uuid
 
 
 def upload_to_azure(file_path):
@@ -10,8 +10,7 @@ def upload_to_azure(file_path):
 
     blob_service = BlobServiceClient.from_connection_string(conn_str)
 
-    original_name = os.path.basename(file_path)
-    blob_name = f"{uuid.uuid4()}_{original_name}"
+    blob_name = Path(file_path).name
 
     blob_client = blob_service.get_blob_client(
         container=container,

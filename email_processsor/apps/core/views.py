@@ -16,7 +16,7 @@ from rest_framework.views import APIView
 
 from .models import (
     COARecord, EmailLog, EscalationRecord, OrderTrackingRecord,
-    OtherRecord, ReplyEmail, SkipLog,
+    ReplyEmail, SkipLog,
 )
 from .serializers import (
     COARecordSerializer, EmailLogSerializer, EscalationRecordSerializer,
@@ -85,26 +85,6 @@ def resend_escalation(request, record_id):
     return JsonResponse({"status": "error", "error": err}, status=502)
 
 
-# ─── Other record action endpoints ───────────────────────────
-
-@csrf_exempt
-@require_POST
-def reclassify_other(request, record_id):
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
-    new_type = data.get("reclassified_as", "").strip()
-    if not new_type:
-        return JsonResponse({"error": "reclassified_as is required"}, status=400)
-    record = get_object_or_404(OtherRecord, id=record_id)
-    record.reclassified_as = new_type
-    record.review_status = "REVIEWED"
-    record.review_notes = data.get("notes", "")
-    record.save(update_fields=["reclassified_as", "review_status", "review_notes"])
-    return JsonResponse({"status": "ok"})
-
-
 # ─── UI Views ────────────────────────────────────────────────
 
 def dashboard(request):
@@ -121,8 +101,6 @@ def dashboard(request):
         "total_orders": OrderTrackingRecord.objects.count(),
         "pending_orders": OrderTrackingRecord.objects.filter(status="PENDING").count(),
         "total_skipped": SkipLog.objects.count(),
-        "total_others": OtherRecord.objects.count(),
-        "pending_others": OtherRecord.objects.filter(review_status="PENDING").count(),
         "recent_emails": recent_emails,
     }
     return render(request, "core/dashboard.html", context)
@@ -173,17 +151,6 @@ def orders_page(request):
 def skip_log_page(request):
     return render(request, "core/skip_log.html", {
         "records": SkipLog.objects.order_by("-skipped_at")
-    })
-
-
-def others_page(request):
-    review_filter = request.GET.get("review", "")
-    qs = OtherRecord.objects.select_related("email", "reply_email").order_by("-created_at")
-    if review_filter:
-        qs = qs.filter(review_status=review_filter)
-    return render(request, "core/others.html", {
-        "records": qs,
-        "review_filter": review_filter,
     })
 
 

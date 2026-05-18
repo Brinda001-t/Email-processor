@@ -1,8 +1,6 @@
-from openai import OpenAI
-import os
 import json
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+from apps.core.openai_client import client, strip_json_fences
 
 def classify_email(email_text):
     prompt = f"""
@@ -14,6 +12,8 @@ You are an email classifier for a supply chain system. Classify the email into o
 
 - ORDER: Contains an order inquiry, purchase order, or order status request.
   Look for: purchase order number, PO #, order confirmation, delivery status, order inquiry.
+  Also extract the order number if present (e.g. TO1476530, PO-9821, ORD123). Check table
+  headers like "Order Number", inline references, and any alphanumeric ID tied to the order.
 
 - ESCALATION: Contains an urgent issue, complaint, or problem requiring immediate attention.
   Look for: failed tests, wrong delivery, order delays, quality failures, urgent/critical language.
@@ -30,6 +30,7 @@ Return raw JSON only, no markdown, no explanation:
 {{
   "type": "COA or ORDER or ESCALATION or OTHER",
   "subtype": "new or amendment or status_check or driver_status or new_order or general",
+  "order_number": "extracted order number string, or null if not an ORDER or none found",
   "confidence": 0.0,
   "reason": "brief reason for classification"
 }}
@@ -38,16 +39,14 @@ Email:
 {email_text}
 """
 
-    res = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    content = res.choices[0].message.content.strip()
-    if content.startswith("```"):
-        content = content.split("```")[1]
-        if content.startswith("json"):
-            content = content[4:]
-    result = json.loads(content.strip())
-    result["tokens"] = res.usage.total_tokens
-    return result
+    messages = [{"role": "user", "content": prompt}]
+    for attempt in range(2):
+        res = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+        content = strip_json_fences(res.choices[0].message.content.strip())
+        try:
+            result = json.loads(content)
+            result["tokens"] = res.usage.total_tokens
+            return result
+        except json.JSONDecodeError:
+            if attempt == 1:
+                raise

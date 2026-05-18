@@ -1,8 +1,6 @@
-from openai import OpenAI
-import os
 import json
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+from apps.core.openai_client import client, strip_json_fences
 
 
 def extract_coa_data(text):
@@ -29,16 +27,14 @@ Document:
 {text}
 """
 
-    res = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    content = res.choices[0].message.content.strip()
-    if content.startswith("```"):
-        content = content.split("```")[1]
-        if content.startswith("json"):
-            content = content[4:]
-    result = json.loads(content.strip())
-    result["_tokens"] = res.usage.total_tokens
-    return result
+    messages = [{"role": "user", "content": prompt}]
+    for attempt in range(2):
+        res = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+        content = strip_json_fences(res.choices[0].message.content.strip())
+        try:
+            result = json.loads(content)
+            result["_tokens"] = res.usage.total_tokens
+            return result
+        except json.JSONDecodeError:
+            if attempt == 1:
+                raise
