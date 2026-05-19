@@ -30,7 +30,7 @@ Return raw JSON only, no markdown, no explanation:
 {{
   "type": "COA or ORDER or ESCALATION or OTHER",
   "subtype": "new or amendment or status_check or driver_status or new_order or general",
-  "order_number": "extracted order number string, or null if not an ORDER or none found",
+  "order_numbers": ["list of all order/document IDs found in the email, or [] if none"],
   "confidence": 0.0,
   "reason": "brief reason for classification"
 }}
@@ -41,7 +41,7 @@ Email:
 
     messages = [{"role": "user", "content": prompt}]
     for attempt in range(2):
-        res = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+        res = client.chat.completions.create(model="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", messages=messages)  # was "openai/gpt-4o"
         content = strip_json_fences(res.choices[0].message.content.strip())
         try:
             result = json.loads(content)

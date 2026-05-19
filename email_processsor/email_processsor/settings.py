@@ -97,20 +97,35 @@ WSGI_APPLICATION = 'email_processsor.wsgi.application'
 # }
 
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': os.environ.get('DB_NAME', 'email_processor'),
+#         'USER': os.environ.get('DB_USER', 'postgres'),
+#         'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+#         'HOST': os.environ.get('DB_HOST', 'localhost'),
+#         'PORT': os.environ.get('DB_PORT', '5432'),
+#         'CONN_MAX_AGE': 60,
+#         'OPTIONS': {
+#             'connect_timeout': 10,
+#         },
+#     }
+# }
+
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'email_processor'),
-        'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
-        'CONN_MAX_AGE': 60,
+        'ENGINE': 'email_processsor.db_backend',
+        'NAME': os.environ.get('AZURE_SQL_DB'),
+        'HOST': os.environ.get('AZURE_SQL_SERVER'),
+        'PORT': '1433',
         'OPTIONS': {
-            'connect_timeout': 10,
+            'driver': 'ODBC Driver 18 for SQL Server',
+            'extra_params': 'Encrypt=yes;TrustServerCertificate=no;',
         },
     }
 }
+
 
 
 # Password validation

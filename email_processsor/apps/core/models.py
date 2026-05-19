@@ -9,6 +9,7 @@ _STATUS_CHOICES = [
 
 
 class EmailLog(models.Model):
+    
     """Parent/original inbound emails (no in_reply_to)."""
     message_id = models.CharField(max_length=255, unique=True)
     subject = models.TextField()
@@ -35,9 +36,14 @@ class EmailLog(models.Model):
 
     def __str__(self):
         return self.subject
+    
+
+    class Meta:
+        db_table = 'emailflow].[EmailLog'
 
 
 class ReplyEmail(models.Model):
+    
     """Reply/follow-up emails. Linked to the parent EmailLog via the parent FK."""
     message_id = models.CharField(max_length=255, unique=True)
     subject = models.TextField()
@@ -75,6 +81,9 @@ class ReplyEmail(models.Model):
 
     def __str__(self):
         return f"Re: {self.subject}"
+    
+    class Meta:
+        db_table = 'emailflow].[ReplyEmail'
 
 
 class SkipLog(models.Model):
@@ -85,6 +94,7 @@ class SkipLog(models.Model):
     skipped_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = 'emailflow].[SkipLog'
         indexes = [models.Index(fields=["skipped_at"])]
 
 
@@ -123,6 +133,7 @@ class COARecord(models.Model):
     changes_summary = models.JSONField(null=True, blank=True)
 
     class Meta:
+        db_table = 'emailflow].[COARecord'
         indexes = [
             models.Index(fields=["lot_number", "company", "is_current"]),
         ]
@@ -155,6 +166,10 @@ class EscalationRecord(models.Model):
     @property
     def linked_email(self):
         return self.email or self.reply_email
+    
+    class Meta:
+        db_table = 'emailflow].[EscalationRecord'
+
 
 
 class OrderTrackingRecord(models.Model):
@@ -163,10 +178,10 @@ class OrderTrackingRecord(models.Model):
         ("RESOLVED", "RESOLVED"),
     ]
 
-    email = models.OneToOneField(
+    email = models.ForeignKey(
         EmailLog, null=True, blank=True, on_delete=models.CASCADE
     )
-    reply_email = models.OneToOneField(
+    reply_email = models.ForeignKey(
         ReplyEmail, null=True, blank=True, on_delete=models.CASCADE
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING")
@@ -174,6 +189,7 @@ class OrderTrackingRecord(models.Model):
     resolved_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        db_table = 'emailflow].[OrderTrackingRecord'
         indexes = [
             models.Index(fields=["status"]),
         ]

@@ -12,7 +12,7 @@ from .models import (
     OrderTrackingRecord, SkipLog,
 )
 from .gmail_service import GmailService
-from .db_service import get_order_status, get_driver_status
+from .db_service import get_order_status
 from apps.classifier.ai_classifier import classify_email
 from apps.classifier.rule_classifier import rule_classify
 from apps.coa.extractor import extract_coa_data
@@ -37,13 +37,26 @@ _ORDER_NUMBER_RE = re.compile(
     re.IGNORECASE,
 )
 
+_DOC_ID_RE = re.compile(
+    r'(?:^|\t)([A-Z]{2,}[A-Z0-9]{3,})\b',
+    re.MULTILINE,
+)
 
-def _extract_order_number(text: str) -> str | None:
+
+def _extract_all_order_numbers(text: str) -> list:
+    seen = set()
+    results = []
     for m in _ORDER_NUMBER_RE.finditer(text):
         candidate = m.group(1).upper().rstrip('-')
-        if any(c.isdigit() for c in candidate):
-            return candidate
-    return None
+        if any(c.isdigit() for c in candidate) and candidate not in seen:
+            seen.add(candidate)
+            results.append(candidate)
+    for m in _DOC_ID_RE.finditer(text):
+        candidate = m.group(1).upper()
+        if any(c.isdigit() for c in candidate) and candidate not in seen:
+            seen.add(candidate)
+            results.append(candidate)
+    return results
 
 
 def _norm_lot(lot):
@@ -172,7 +185,7 @@ def check_and_process_emails():
                     if tid:
                         existing = (
                             COARecord.objects
-                            .select_for_update(of=('self',))
+                            .select_for_update()
                             .filter(
                                 models.Q(email__thread_id=tid)
                                 | models.Q(reply_email__thread_id=tid),
@@ -185,14 +198,14 @@ def check_and_process_emails():
                     if not existing and lot_number and company:
                         existing = (
                             COARecord.objects
-                            .select_for_update(of=('self',))
+                            .select_for_update()
                             .filter(lot_number=lot_number, company=company, is_current=True)
                             .first()
                         )
                         if not existing:
                             norm_lot = _norm_lot(lot_number)
                             norm_co = _norm_company(company)
-                            for candidate in COARecord.objects.select_for_update(of=('self',)).filter(is_current=True):
+                            for candidate in COARecord.objects.select_for_update().filter(is_current=True):
                                 if _norm_lot(candidate.lot_number) == norm_lot and _norm_company(candidate.company) == norm_co:
                                     existing = candidate
                                     break
@@ -255,57 +268,69 @@ def check_and_process_emails():
 
                 subtype = result.get("subtype", "status_check")
 
-                order_number = result.get("order_number") or _extract_order_number(subject + " " + body)
+                ai_numbers = result.get("order_numbers") or (
+                    [result["order_number"]] if result.get("order_number") else []
+                )
+                regex_numbers = _extract_all_order_numbers(subject + " " + body)
+                seen_ids = set()
+                order_numbers = []
+                for n in ai_numbers + regex_numbers:
+                    if n not in seen_ids:
+                        seen_ids.add(n)
+                        order_numbers.append(n)
+                if not order_numbers:
+                    order_numbers = ["UNKNOWN"]
 
                 order_record, _ = OrderTrackingRecord.objects.get_or_create(
                     **_email_fk(),
                     defaults={
                         "status": "PENDING",
-                        "order_number": order_number or "",
+                        "order_number": order_numbers[0],
                     }
                 )
 
                 if subtype in ("status_check", "driver_status"):
                     try:
-                        if subtype == "status_check":
-                            data = get_order_status(order_number or "UNKNOWN")
-                            if data["found"]:
-                                reply_body = (
-                                    f"Dear Customer,\n\n"
-                                    f"Here is the current status for Order {data['order_number']}:\n\n"
-                                    f"Status        : {data['status']}\n"
-                                    f"Expected Date : {data['expected_date']}\n"
-                                    f"Notes         : {data['notes']}\n\n"
-                                    f"Email Flow System"
-                                )
-                            else:
-                                reply_body = (
-                                    f"Dear Customer,\n\n"
-                                    f"We could not find an order matching your inquiry"
-                                    f"{' (Order: ' + order_number + ')' if order_number else ''}. "
-                                    f"Please verify your order number and try again.\n\n"
-                                    f"Email Flow System"
-                                )
-                        else:  # driver_status
-                            data = get_driver_status(order_number or "UNKNOWN")
-                            if data["found"]:
-                                reply_body = (
-                                    f"Dear Customer,\n\n"
-                                    f"Here is the delivery update for Order {data['order_number']}:\n\n"
-                                    f"Driver          : {data['driver_name']}\n"
-                                    f"Current Location: {data['current_location']}\n"
-                                    f"ETA             : {data['eta']}\n"
-                                    f"Notes           : {data['notes']}\n\n"
-                                    f"Email Flow System"
-                                )
-                            else:
-                                reply_body = (
-                                    f"Dear Customer,\n\n"
-                                    f"We could not find delivery information for your order"
-                                    f"{' (Order: ' + order_number + ')' if order_number else ''}. "
-                                    f"Please verify your order number and try again.\n\n"
-                                    f"Email Flow System"
-                                )
+                        sections = []
+                        for doc_id in order_numbers:
+                            data = get_order_status(doc_id)
+                            if subtype == "status_check":
+                                if data["found"]:
+                                    section = (
+                                        f"Document {data['document_id']}:\n"
+                                        f"  Document Type : {data['document_type']}\n"
+                                        f"  Status        : {data['status']}\n"
+                                    )
+                                    driver = data.get("driver_info")
+                                    if driver and driver.get("found"):
+                                        section += (
+                                            f"  Driver Update:\n"
+                                            f"    Current Stage : {driver['current_stage']}\n"
+                                            f"    Stage Status  : {driver['stage_status']}\n"
+                                        )
+                                else:
+                                    section = f"Document {doc_id}:\n  No record found. Please verify the ID.\n"
+                            else:  # driver_status
+                                if data["found"]:
+                                    driver = data.get("driver_info")
+                                    if driver and driver.get("found"):
+                                        section = (
+                                            f"Document {data['document_id']}:\n"
+                                            f"  Current Stage : {driver['current_stage']}\n"
+                                            f"    Stage Status  : {driver['stage_status']}\n"
+                                        )
+                                    else:
+                                        section = f"Document {doc_id}:\n  No driver information available.\n"
+                                else:
+                                    section = f"Document {doc_id}:\n  No record found. Please verify the ID.\n"
+                            sections.append(section)
+
+                        reply_body = (
+                            "Dear Customer,\n\n"
+                            "Here is the current status for your order inquiry:\n\n"
+                            + "\n".join(sections)
+                            + "\nEmail Flow System"
+                        )
 
                         gmail.send_email(
                             to_address=sender,
