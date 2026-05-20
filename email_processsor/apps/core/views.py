@@ -3,6 +3,8 @@ import os
 from collections import defaultdict
 from urllib.parse import unquote, urlparse
 
+from django.db.models import Count, Q
+
 from azure.storage.blob import BlobServiceClient
 from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse
@@ -94,12 +96,17 @@ def dashboard(request):
     page = request.GET.get("page", 1)
     recent_emails = paginator.get_page(page)
 
+    order_stats = OrderTrackingRecord.objects.aggregate(
+        total=Count("id"),
+        pending=Count("id", filter=Q(status="PENDING")),
+    )
+
     context = {
         "total_emails": EmailLog.objects.count() + ReplyEmail.objects.count(),
         "total_coa": COARecord.objects.filter(is_current=True).count(),
         "total_escalations": EscalationRecord.objects.count(),
-        "total_orders": OrderTrackingRecord.objects.count(),
-        "pending_orders": OrderTrackingRecord.objects.filter(status="PENDING").count(),
+        "total_orders": order_stats["total"],
+        "pending_orders": order_stats["pending"],
         "total_skipped": SkipLog.objects.count(),
         "recent_emails": recent_emails,
     }
@@ -107,20 +114,26 @@ def dashboard(request):
 
 
 def emails_page(request):
-    emails = list(EmailLog.objects.order_by("-received_at"))
+    qs = EmailLog.objects.order_by("-received_at")
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
 
     reply_counts = defaultdict(int)
     for r in ReplyEmail.objects.values_list("thread_id", flat=True):
         if r:
             reply_counts[r] += 1
 
-    for e in emails:
+    for e in page_obj:
         e.thread_size = 1 + reply_counts.get(e.thread_id, 0) if e.thread_id else 1
         e.is_thread_root = True
         e.is_reply = False
         e.parent_email = None
 
-    return render(request, "core/emails.html", {"emails": emails})
+    return render(request, "core/emails.html", {
+        "emails": page_obj,
+        "total_emails": paginator.count,
+    })
 
 
 def coa_page(request):
@@ -137,14 +150,22 @@ def coa_page(request):
 
 
 def escalations_page(request):
+    qs = EscalationRecord.objects.select_related("email", "reply_email").order_by("-id")
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
     return render(request, "core/escalations.html", {
-        "records": EscalationRecord.objects.select_related("email", "reply_email").order_by("-id"),
+        "records": page_obj,
+        "total_escalations": paginator.count,
     })
 
 
 def orders_page(request):
+    qs = OrderTrackingRecord.objects.select_related("email", "reply_email").order_by("-id")
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
     return render(request, "core/orders.html", {
-        "records": OrderTrackingRecord.objects.select_related("email", "reply_email").order_by("-id")
+        "records": page_obj,
+        "total_orders": paginator.count,
     })
 
 

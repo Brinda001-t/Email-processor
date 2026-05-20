@@ -38,24 +38,46 @@ _ORDER_NUMBER_RE = re.compile(
 )
 
 _DOC_ID_RE = re.compile(
-    r'(?:^|\t)([A-Z]{2,}[A-Z0-9]{3,})\b',
-    re.MULTILINE,
+    r'\b([A-Z]{2,}[A-Z0-9]{3,})\b',
 )
 
+_SUBJECT_TOKEN_RE = re.compile(
+    r'\b([A-Z][A-Z0-9]{2,})\b',
+)
 
-def _extract_all_order_numbers(text: str) -> list:
+_STOPWORDS = {
+    "THE", "AND", "FOR", "ANY", "ARE", "HAS", "NOT", "BUT", "THIS",
+    "WITH", "FROM", "THAT", "HAVE", "WILL", "YOUR", "DEAR", "GOOD",
+    "MORNING", "PLEASE", "ORDER", "STATUS", "UPDATE", "CHECK", "UPDATES",
+    "INBOX", "MAIL", "EMAIL", "SUBJECT", "RE", "FWD",
+}
+
+
+def _extract_all_order_numbers(text: str, subject: str = "") -> list:
     seen = set()
     results = []
+
+    # From subject — accept all-alpha IDs too (no digit requirement)
+    for m in _SUBJECT_TOKEN_RE.finditer(subject.upper()):
+        candidate = m.group(1)
+        if candidate not in _STOPWORDS and candidate not in seen:
+            seen.add(candidate)
+            results.append(candidate)
+
+    # From body — keyword-prefixed patterns (PO #, order #, etc.)
     for m in _ORDER_NUMBER_RE.finditer(text):
         candidate = m.group(1).upper().rstrip('-')
         if any(c.isdigit() for c in candidate) and candidate not in seen:
             seen.add(candidate)
             results.append(candidate)
+
+    # From body — standalone doc IDs (must contain a digit to avoid false positives)
     for m in _DOC_ID_RE.finditer(text):
         candidate = m.group(1).upper()
         if any(c.isdigit() for c in candidate) and candidate not in seen:
             seen.add(candidate)
             results.append(candidate)
+
     return results
 
 
@@ -153,7 +175,7 @@ def check_and_process_emails():
                 }
                 method = "rule_based"
             else:
-                result = classify_email(body)
+                result = classify_email(f"Subject: {subject}\n\n{body}")
                 method = "ai"
 
             log.classification = result["type"]
@@ -271,7 +293,7 @@ def check_and_process_emails():
                 ai_numbers = result.get("order_numbers") or (
                     [result["order_number"]] if result.get("order_number") else []
                 )
-                regex_numbers = _extract_all_order_numbers(subject + " " + body)
+                regex_numbers = _extract_all_order_numbers(body, subject=subject)
                 seen_ids = set()
                 order_numbers = []
                 for n in ai_numbers + regex_numbers:
@@ -285,56 +307,82 @@ def check_and_process_emails():
                     **_email_fk(),
                     defaults={
                         "status": "PENDING",
-                        "order_number": order_numbers[0],
+                        "order_number": ", ".join(order_numbers),
                     }
                 )
 
                 if subtype in ("status_check", "driver_status"):
                     try:
+                        DIVIDER = "━" * 40
                         sections = []
                         for doc_id in order_numbers:
                             data = get_order_status(doc_id)
                             if subtype == "status_check":
                                 if data["found"]:
                                     section = (
-                                        f"Document {data['document_id']}:\n"
-                                        f"  Document Type : {data['document_type']}\n"
-                                        f"  Status        : {data['status']}\n"
+                                        f"  Document ID        : {data['document_id']}\n"
+                                        f"  Document Type      : {data['document_type'].title()}\n"
+                                        f"\n"
+                                        f"  Appointment Status : {data['status']}\n"
                                     )
                                     driver = data.get("driver_info")
                                     if driver and driver.get("found"):
                                         section += (
-                                            f"  Driver Update:\n"
-                                            f"    Current Stage : {driver['current_stage']}\n"
-                                            f"    Stage Status  : {driver['stage_status']}\n"
+                                            f"\n"
+                                            f"  Driver Check-In Status\n"
+                                            f"  ├─ Current Stage   : {driver['current_stage']}\n"
+                                            f"  └─ Stage Status    : {driver['stage_status'].title()}\n"
                                         )
                                 else:
-                                    section = f"Document {doc_id}:\n  No record found. Please verify the ID.\n"
+                                    section = (
+                                        f"  Document ID        : {doc_id}\n"
+                                        f"  ⚠ No record found. Please verify the document ID\n"
+                                        f"    and resubmit your request.\n"
+                                    )
                             else:  # driver_status
                                 if data["found"]:
                                     driver = data.get("driver_info")
                                     if driver and driver.get("found"):
                                         section = (
-                                            f"Document {data['document_id']}:\n"
-                                            f"  Current Stage : {driver['current_stage']}\n"
-                                            f"    Stage Status  : {driver['stage_status']}\n"
+                                            f"  Document ID        : {data['document_id']}\n"
+                                            f"\n"
+                                            f"  Driver Check-In Status\n"
+                                            f"  ├─ Current Stage   : {driver['current_stage']}\n"
+                                            f"  └─ Stage Status    : {driver['stage_status'].title()}\n"
                                         )
                                     else:
-                                        section = f"Document {doc_id}:\n  No driver information available.\n"
+                                        section = (
+                                            f"  Document ID        : {doc_id}\n"
+                                            f"  No driver information available.\n"
+                                        )
                                 else:
-                                    section = f"Document {doc_id}:\n  No record found. Please verify the ID.\n"
+                                    section = (
+                                        f"  Document ID        : {doc_id}\n"
+                                        f"  ⚠ No record found. Please verify the document ID\n"
+                                        f"    and resubmit your request.\n"
+                                    )
                             sections.append(section)
+
+                        divider_line = f"{DIVIDER}\n"
+                        sections_text = divider_line.join(
+                            f"{s}\n" for s in sections
+                        )
 
                         reply_body = (
                             "Dear Customer,\n\n"
-                            "Here is the current status for your order inquiry:\n\n"
-                            + "\n".join(sections)
-                            + "\nEmail Flow System"
+                            "Thank you for contacting us. Please find below the status details\n"
+                            "for your requested document(s).\n\n"
+                            f"{DIVIDER}\n"
+                            f"  ORDER STATUS DETAILS\n"
+                            f"{DIVIDER}\n\n"
+                            + sections_text
+                            + f"{DIVIDER}\n\n"
+                            "Thank you"
                         )
 
                         gmail.send_email(
                             to_address=sender,
-                            subject=f"Re: {subject}",
+                            subject="Re: Order Status Update – Document Reference Inquiry",
                             body=reply_body,
                         )
 

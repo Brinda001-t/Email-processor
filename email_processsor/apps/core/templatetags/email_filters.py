@@ -13,3 +13,13 @@ def email_only(value):
 @register.filter
 def get_item(dictionary, key):
     return dictionary.get(key)
+
+
+@register.filter
+def split(value, delimiter=","):
+    return [part for part in str(value).split(delimiter) if part.strip()]
+
+
+@register.filter
+def trim(value):
+    return str(value).strip()

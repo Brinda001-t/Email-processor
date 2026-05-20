@@ -1,9 +1,9 @@
 import imaplib
-import email as email_lib
+import email as email_lib      #email bytes into readable email objects 
 from email.header import decode_header
-from email.utils import parseaddr
-from html.parser import HTMLParser
-import os
+from email.utils import parseaddr    # Extracts clean email address from:
+from html.parser import HTMLParser   #Used to strip HTML tags from email body
+import os     # Used for extracting Gmail thread ID
 import re
 
 
@@ -45,7 +45,7 @@ class GmailService:
 
         emails = []
         for uid in uids[0].split():
-            _, msg_data = self.mail.uid("fetch", uid, "(X-GM-THRID RFC822)")
+            _, msg_data = self.mail.uid("fetch", uid, "(X-GM-THRID BODY.PEEK[])")
             header_part = msg_data[0][0]
             thread_match = re.search(rb'X-GM-THRID\s+(\d+)', header_part)
             thread_id = thread_match.group(1).decode() if thread_match else None
