@@ -41,7 +41,7 @@ Email:
 
     messages = [{"role": "user", "content": prompt}]
     for attempt in range(2):
-        res = client.chat.completions.create(model="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", messages=messages)  # was "openai/gpt-4o"
+        res = client.chat.completions.create(model="gpt-4o", messages=messages)
         content = strip_json_fences(res.choices[0].message.content.strip())
         try:
             result = json.loads(content)

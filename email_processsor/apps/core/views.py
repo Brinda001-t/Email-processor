@@ -8,6 +8,8 @@ from django.db.models import Count, Q
 from azure.storage.blob import BlobServiceClient
 from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse
+from django.contrib.auth import logout
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -68,6 +70,11 @@ class TriggerEmailProcessingView(APIView):
 
 @csrf_exempt
 @require_POST
+def logout_view(request):
+    logout(request)
+    return redirect("/login/")
+
+
 def resend_escalation(request, record_id):
     record = get_object_or_404(EscalationRecord, id=record_id)
     source = record.linked_email
@@ -89,6 +96,7 @@ def resend_escalation(request, record_id):
 
 # ─── UI Views ────────────────────────────────────────────────
 
+@login_required
 def dashboard(request):
     all_emails = EmailLog.objects.order_by("-received_at")
 
@@ -113,6 +121,7 @@ def dashboard(request):
     return render(request, "core/dashboard.html", context)
 
 
+@login_required
 def emails_page(request):
     qs = EmailLog.objects.order_by("-received_at")
 
@@ -136,6 +145,7 @@ def emails_page(request):
     })
 
 
+@login_required
 def coa_page(request):
     show_all = request.GET.get("show_all") == "1"
     qs = COARecord.objects.select_related(
@@ -149,6 +159,7 @@ def coa_page(request):
     })
 
 
+@login_required
 def escalations_page(request):
     qs = EscalationRecord.objects.select_related("email", "reply_email").order_by("-id")
     paginator = Paginator(qs, 20)
@@ -159,6 +170,7 @@ def escalations_page(request):
     })
 
 
+@login_required
 def orders_page(request):
     qs = OrderTrackingRecord.objects.select_related("email", "reply_email").order_by("-id")
     paginator = Paginator(qs, 20)
@@ -169,18 +181,21 @@ def orders_page(request):
     })
 
 
+@login_required
 def skip_log_page(request):
     return render(request, "core/skip_log.html", {
         "records": SkipLog.objects.order_by("-skipped_at")
     })
 
 
+@login_required
 def trigger_view(request):
     if request.method == "POST":
         check_and_process_emails.delay()
     return redirect("/dashboard/")
 
 
+@login_required
 def download_coa_pdf(request, record_id):
     record = get_object_or_404(COARecord, id=record_id)
 

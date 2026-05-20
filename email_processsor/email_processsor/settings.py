@@ -164,6 +164,15 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/dashboard/'
+LOGOUT_REDIRECT_URL = '/login/'
+
+AUTHENTICATION_BACKENDS = [
+    'apps.core.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 

@@ -30,7 +30,7 @@ class EmailLog(models.Model):
 
     rfc_message_id = models.CharField(max_length=500, null=True, blank=True, db_index=True)
     in_reply_to = models.CharField(max_length=500, null=True, blank=True)
-    thread_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    thread_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
 
     responded_at = models.DateTimeField(null=True, blank=True)
 
@@ -66,7 +66,7 @@ class ReplyEmail(models.Model):
     in_reply_to = models.CharField(max_length=500, null=True, blank=True)
 
     # Gmail thread_id stored directly (same value as parent.thread_id)
-    thread_id = models.CharField(max_length=50, null=True, blank=True, db_index=True)
+    thread_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
 
     responded_at = models.DateTimeField(null=True, blank=True)
 

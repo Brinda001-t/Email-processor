@@ -11,7 +11,7 @@ from .models import (
     EmailLog, ReplyEmail, COARecord, EscalationRecord,
     OrderTrackingRecord, SkipLog,
 )
-from .gmail_service import GmailService
+from .outlook_service import OutlookService, get_access_token
 from .db_service import get_order_status
 from apps.classifier.ai_classifier import classify_email
 from apps.classifier.rule_classifier import rule_classify
@@ -57,10 +57,10 @@ def _extract_all_order_numbers(text: str, subject: str = "") -> list:
     seen = set()
     results = []
 
-    # From subject — accept all-alpha IDs too (no digit requirement)
+    # From subject — must contain a digit (same rule as body to avoid plain words)
     for m in _SUBJECT_TOKEN_RE.finditer(subject.upper()):
         candidate = m.group(1)
-        if candidate not in _STOPWORDS and candidate not in seen:
+        if any(c.isdigit() for c in candidate) and candidate not in _STOPWORDS and candidate not in seen:
             seen.add(candidate)
             results.append(candidate)
 
@@ -96,9 +96,8 @@ def _norm_company(name):
 @shared_task
 def check_and_process_emails():
 
-    gmail = GmailService()
-    emails = gmail.fetch_unread_emails()
-
+    outlook = OutlookService(token=get_access_token())
+    emails = outlook.fetch_unread_emails()
     for email in emails:
 
         message_id = email["id"]
@@ -130,7 +129,7 @@ def check_and_process_emails():
                     "skip_reason": rule_result.get("reason", "unknown"),
                 }
             )
-            gmail.mark_as_read(message_id)
+            outlook.mark_as_read(message_id)
             continue
 
         if is_reply:
@@ -320,7 +319,7 @@ def check_and_process_emails():
                             if subtype == "status_check":
                                 if data["found"]:
                                     section = (
-                                        f"  Document ID        : {data['document_id']}\n"
+                                        f"  Order Number       :{data['document_id']}\n"
                                         f"  Document Type      : {data['document_type'].title()}\n"
                                         f"\n"
                                         f"  Appointment Status : {data['status']}\n"
@@ -335,7 +334,7 @@ def check_and_process_emails():
                                         )
                                 else:
                                     section = (
-                                        f"  Document ID        : {doc_id}\n"
+                                        f"  Order Number       :{doc_id}\n"
                                         f"  ⚠ No record found. Please verify the document ID\n"
                                         f"    and resubmit your request.\n"
                                     )
@@ -344,7 +343,7 @@ def check_and_process_emails():
                                     driver = data.get("driver_info")
                                     if driver and driver.get("found"):
                                         section = (
-                                            f"  Document ID        : {data['document_id']}\n"
+                                            f"  Order Number       :{data['document_id']}\n"
                                             f"\n"
                                             f"  Driver Check-In Status\n"
                                             f"  ├─ Current Stage   : {driver['current_stage']}\n"
@@ -352,12 +351,12 @@ def check_and_process_emails():
                                         )
                                     else:
                                         section = (
-                                            f"  Document ID        : {doc_id}\n"
+                                            f"  Order Number       :{doc_id}\n"
                                             f"  No driver information available.\n"
                                         )
                                 else:
                                     section = (
-                                        f"  Document ID        : {doc_id}\n"
+                                        f"  Order Number       :{doc_id}\n"
                                         f"  ⚠ No record found. Please verify the document ID\n"
                                         f"    and resubmit your request.\n"
                                     )
@@ -380,7 +379,7 @@ def check_and_process_emails():
                             "Thank you"
                         )
 
-                        gmail.send_email(
+                        outlook.send_email(
                             to_address=sender,
                             subject="Re: Order Status Update – Document Reference Inquiry",
                             body=reply_body,
@@ -413,7 +412,7 @@ def check_and_process_emails():
             if result["type"] == "ESCALATION":
                 send_escalation_alert.apply_async(args=[log.id], countdown=PRIORITY_HIGH_MINUTES * 60)
             if mark_read:
-                gmail.mark_as_read(message_id)
+                outlook.mark_as_read(message_id)
 
         except Exception:
             logger.exception("Failed processing email %s (subject: %s)", message_id, log.subject)

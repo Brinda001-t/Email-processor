@@ -1,12 +1,16 @@
+from django.contrib.auth.views import LoginView
 from django.urls import path
 from .views import (
     EmailLogListView, COARecordListView, EscalationRecordListView, TriggerEmailProcessingView,
     dashboard, emails_page, coa_page, escalations_page, orders_page, skip_log_page,
     trigger_view, download_coa_pdf,
-    resend_escalation,
+    resend_escalation, logout_view,
 )
 
 urlpatterns = [
+    path("login/",  LoginView.as_view(template_name="core/login.html"), name="login"),
+    path("logout/", logout_view,                                        name="logout"),
+
     # API
     path("api/emails/",      EmailLogListView.as_view(),          name="email-list"),
     path("api/coa/",         COARecordListView.as_view(),          name="coa-list"),
