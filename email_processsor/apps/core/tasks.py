@@ -23,7 +23,8 @@ from apps.escalation.teams_notifier import send_teams_alert
 logger = logging.getLogger(__name__)
 
 # Minutes unresponded before HIGH priority escalation
-PRIORITY_HIGH_MINUTES = 60
+# PRIORITY_HIGH_MINUTES = 60
+PRIORITY_HIGH_MINUTES = 2
 
 _COMPARABLE_FIELDS = [
     "company", "address", "contact_phone", "contact_email",
@@ -310,7 +311,30 @@ def check_and_process_emails():
                     }
                 )
 
-                if subtype in ("status_check", "driver_status"):
+                if order_numbers == ["UNKNOWN"]:
+                    try:
+                        reply_body = (
+                            "Dear Customer,\n\n"
+                            "Thank you for contacting us.\n\n"
+                            "To check your order status, we need your order or PO number. "
+                            "Please reply to this email with your order number and we will "
+                            "get back to you promptly.\n\n"
+                            "Thank you"
+                        )
+                        outlook.send_email(
+                            to_address=sender,
+                            subject="Re: Order Status – Order Number Required",
+                            body=reply_body,
+                        )
+                        now = timezone.now()
+                        order_record.status = "PENDING"
+                        order_record.save(update_fields=["status"])
+                        log.responded_at = now
+                        log.save(update_fields=["responded_at"])
+                    except Exception:
+                        logger.exception("Failed to send order-number-required reply for email %s", message_id)
+
+                elif subtype in ("status_check", "driver_status"):
                     try:
                         DIVIDER = "━" * 40
                         sections = []
@@ -443,7 +467,7 @@ def send_escalation_alert(email_log_id):
     if log.thread_id and ReplyEmail.objects.filter(thread_id=log.thread_id).exists():
         return
 
-    reason = f"Email unattended for 60 minutes (type: {classification or 'UNKNOWN'})"
+    reason = f"Email unattended for 2 minutes (type: {classification or 'UNKNOWN'})"
     record = EscalationRecord.objects.create(
         email=log,
         priority="HIGH",

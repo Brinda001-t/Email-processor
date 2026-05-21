@@ -2,6 +2,19 @@ import os
 import time
 import logging
 import requests
+from html.parser import HTMLParser
+
+
+class _StripHTML(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self._parts = []
+
+    def handle_data(self, data):
+        self._parts.append(data)
+
+    def get_text(self):
+        return " ".join(self._parts).strip()
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +47,10 @@ def send_teams_alert(email, reason="", priority="HIGH"):
         return False, "TEAMS_WEBHOOK_URL not configured"
 
     sender = email.get("from", {}).get("emailAddress", {}).get("address", "Unknown")
-    body = email.get("body", {}).get("content", "")
+    body_raw = email.get("body", {}).get("content", "")
+    parser = _StripHTML()
+    parser.feed(body_raw)
+    body = parser.get_text() or body_raw
     body_preview = body[:500] + "..." if len(body) > 500 else body
 
     theme_color = _PRIORITY_THEME.get(priority, "FF0000")
