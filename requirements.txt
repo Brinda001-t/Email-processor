@@ -11,15 +11,12 @@ python-dotenv
 
 openai
 
-reportlab
-
-psycopg2-binary
-
-azure-storage-blob
+azure-identity
 
 msal
 
 gunicorn
+whitenoise
 
 mssql-django
 pyodbc

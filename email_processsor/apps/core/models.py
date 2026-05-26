@@ -9,7 +9,6 @@ _STATUS_CHOICES = [
 
 
 class EmailLog(models.Model):
-    
     """Parent/original inbound emails (no in_reply_to)."""
     message_id = models.CharField(max_length=255, unique=True)
     subject = models.TextField()
@@ -36,14 +35,12 @@ class EmailLog(models.Model):
 
     def __str__(self):
         return self.subject
-    
 
     class Meta:
         db_table = 'emailflow].[EmailLog'
 
 
 class ReplyEmail(models.Model):
-    
     """Reply/follow-up emails. Linked to the parent EmailLog via the parent FK."""
     message_id = models.CharField(max_length=255, unique=True)
     subject = models.TextField()
@@ -64,13 +61,10 @@ class ReplyEmail(models.Model):
 
     rfc_message_id = models.CharField(max_length=500, null=True, blank=True, db_index=True)
     in_reply_to = models.CharField(max_length=500, null=True, blank=True)
-
-    # Gmail thread_id stored directly (same value as parent.thread_id)
     thread_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
 
     responded_at = models.DateTimeField(null=True, blank=True)
 
-    # Relational FK to the parent email using EmailLog.id (PK)
     parent = models.ForeignKey(
         EmailLog,
         on_delete=models.SET_NULL,
@@ -81,7 +75,7 @@ class ReplyEmail(models.Model):
 
     def __str__(self):
         return f"Re: {self.subject}"
-    
+
     class Meta:
         db_table = 'emailflow].[ReplyEmail'
 
@@ -96,51 +90,6 @@ class SkipLog(models.Model):
     class Meta:
         db_table = 'emailflow].[SkipLog'
         indexes = [models.Index(fields=["skipped_at"])]
-
-
-class COARecord(models.Model):
-    # Exactly one of email / reply_email is set per record
-    email = models.OneToOneField(
-        EmailLog, null=True, blank=True, on_delete=models.CASCADE, related_name='coa'
-    )
-    reply_email = models.OneToOneField(
-        ReplyEmail, null=True, blank=True, on_delete=models.CASCADE, related_name='coa'
-    )
-
-    company = models.CharField(max_length=255, null=True, blank=True)
-    address = models.TextField(null=True, blank=True)
-    contact_phone = models.CharField(max_length=50, null=True, blank=True)
-    contact_email = models.EmailField(null=True, blank=True)
-    product_name = models.CharField(max_length=255, null=True, blank=True)
-    part_number = models.CharField(max_length=100, null=True, blank=True)
-    lot_number = models.CharField(max_length=100, null=True, blank=True)
-    lot_quantity = models.CharField(max_length=100, null=True, blank=True)
-    manufacture_date = models.CharField(max_length=50, null=True, blank=True)
-    expiration_date = models.CharField(max_length=50, null=True, blank=True)
-    report_date = models.CharField(max_length=50, null=True, blank=True)
-    approved_by = models.CharField(max_length=255, null=True, blank=True)
-    test_results = models.JSONField(null=True, blank=True)
-    pdf_url = models.URLField(null=True, blank=True)
-    status = models.CharField(max_length=20, default="PENDING")
-
-    version = models.IntegerField(default=1)
-    is_current = models.BooleanField(default=True)
-    parent_record = models.ForeignKey(
-        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='amendments'
-    )
-    amendment_reason = models.TextField(blank=True)
-    superseded_at = models.DateTimeField(null=True, blank=True)
-    changes_summary = models.JSONField(null=True, blank=True)
-
-    class Meta:
-        db_table = 'emailflow].[COARecord'
-        indexes = [
-            models.Index(fields=["lot_number", "company", "is_current"]),
-        ]
-
-    @property
-    def linked_email(self):
-        return self.email or self.reply_email
 
 
 _PRIORITY_CHOICES = [
@@ -166,36 +115,6 @@ class EscalationRecord(models.Model):
     @property
     def linked_email(self):
         return self.email or self.reply_email
-    
+
     class Meta:
         db_table = 'emailflow].[EscalationRecord'
-
-
-
-class OrderTrackingRecord(models.Model):
-    STATUS_CHOICES = [
-        ("PENDING", "PENDING"),
-        ("RESOLVED", "RESOLVED"),
-    ]
-
-    email = models.ForeignKey(
-        EmailLog, null=True, blank=True, on_delete=models.CASCADE
-    )
-    reply_email = models.ForeignKey(
-        ReplyEmail, null=True, blank=True, on_delete=models.CASCADE
-    )
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING")
-    order_number = models.CharField(max_length=100, blank=True)
-    resolved_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = 'emailflow].[OrderTrackingRecord'
-        indexes = [
-            models.Index(fields=["status"]),
-        ]
-
-    @property
-    def linked_email(self):
-        return self.email or self.reply_email
-
-
