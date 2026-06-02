@@ -175,3 +175,12 @@ CELERY_BEAT_SCHEDULE = {
 
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+
+API_KEY = os.environ.get('API_KEY')
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "apps.core.permissions.ApiKeyPermission",
+    ],
+}

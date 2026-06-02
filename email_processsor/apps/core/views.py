@@ -1,16 +1,19 @@
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import EmailLog, EscalationRecord, ReplyEmail
-from .serializers import EmailLogSerializer, EscalationRecordSerializer, ReplyEmailSerializer
+from .models import EmailLog, EscalationRecord, ReplyEmail, SkipLog
+from .permissions import ApiKeyPermission
+from .serializers import EmailLogSerializer, EscalationRecordSerializer, ReplyEmailSerializer, SkipLogSerializer
 from .tasks import check_and_process_emails
 from apps.escalation.teams_notifier import send_teams_alert
 
 
 class EmailLogListView(APIView):
+    permission_classes = [ApiKeyPermission]
+
     def get(self, request):
         emails = EmailLog.objects.all().order_by("-received_at")
         serializer = EmailLogSerializer(emails, many=True)
@@ -18,6 +21,8 @@ class EmailLogListView(APIView):
 
 
 class ReplyEmailListView(APIView):
+    permission_classes = [ApiKeyPermission]
+
     def get(self, request):
         replies = ReplyEmail.objects.select_related("parent").order_by("-received_at")
         serializer = ReplyEmailSerializer(replies, many=True)
@@ -25,23 +30,44 @@ class ReplyEmailListView(APIView):
 
 
 class EscalationRecordListView(APIView):
+    permission_classes = [ApiKeyPermission]
+
     def get(self, request):
         records = EscalationRecord.objects.select_related("email", "reply_email").order_by("-id")
         serializer = EscalationRecordSerializer(records, many=True)
         return Response(serializer.data)
 
 
+class SkipLogListView(APIView):
+    permission_classes = [ApiKeyPermission]
+
+    def get(self, request):
+        logs = SkipLog.objects.all().order_by("-skipped_at")
+        serializer = SkipLogSerializer(logs, many=True)
+        return Response(serializer.data)
+
+
 class TriggerEmailProcessingView(APIView):
+    permission_classes = [ApiKeyPermission]
+
     def post(self, request):
-        check_and_process_emails.delay()
+        try:
+            check_and_process_emails.delay()
+        except Exception as exc:
+            return Response(
+                {"error": "Task queue unavailable", "detail": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         return Response({"message": "Email processing triggered."}, status=status.HTTP_202_ACCEPTED)
 
 
+@api_view(["POST"])
+@permission_classes([ApiKeyPermission])
 def resend_escalation(request, record_id):
     record = get_object_or_404(EscalationRecord, id=record_id)
     source = record.linked_email
     if not source:
-        return JsonResponse({"error": "No linked email found"}, status=400)
+        return Response({"error": "No linked email found"}, status=status.HTTP_400_BAD_REQUEST)
     alert_payload = {
         "subject": source.subject,
         "from": {"emailAddress": {"address": source.sender}},
@@ -52,5 +78,5 @@ def resend_escalation(request, record_id):
     record.teams_error = "" if sent else err
     record.save(update_fields=["teams_sent", "teams_error"])
     if sent:
-        return JsonResponse({"status": "ok"})
-    return JsonResponse({"status": "error", "error": err}, status=502)
+        return Response({"status": "ok"})
+    return Response({"status": "error", "error": err}, status=status.HTTP_502_BAD_GATEWAY)

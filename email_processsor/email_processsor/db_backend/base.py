@@ -55,9 +55,12 @@ from mssql.base import DatabaseWrapper as MssqlDatabaseWrapper
 
 
 def _get_token():
-    credential = DefaultAzureCredential()
-    token = credential.get_token("https://database.windows.net/.default")
-    return token.token
+    try:
+        credential = DefaultAzureCredential()
+        token = credential.get_token("https://database.windows.net/.default")
+        return token.token
+    except Exception as exc:
+        raise RuntimeError(f"Azure DB token acquisition failed: {exc}") from exc
 
 
 class DatabaseWrapper(MssqlDatabaseWrapper):
@@ -68,4 +71,3 @@ class DatabaseWrapper(MssqlDatabaseWrapper):
     def get_new_connection(self, conn_params):
         conn_params["TOKEN"] = _get_token()
         return super().get_new_connection(conn_params)
-
