@@ -25,6 +25,20 @@ You are an email classifier. Classify the email as ESCALATION or OTHER.
   problem, as it indicates the sender is blocked and needs an immediate response.
 
 - OTHER: Anything that does not require urgent attention.
+  Also classify as OTHER if the email is a positive confirmation or resolution —
+  e.g. "ready to ship", "already dispatched", "all set", "issue resolved",
+  "confirmed", "thank you", "no problem", "looks good", "on its way".
+  A reply that resolves or acknowledges a situation is NOT an escalation.
+  Also classify as OTHER if the sender is already self-resolving the issue and
+  not requesting action from the recipient — e.g. "I need to get with IT",
+  "we are looking into it", "I will follow up", "working on it", "my apologies
+  for the delay" as a courtesy note. An FYI update where no response is expected
+  is NOT an escalation.
+  Also classify as OTHER if the sender describes a problem but immediately provides
+  an alternative plan or new ETA — e.g. "driver had a breakdown, we will send
+  a different driver", "unable to load today, will deliver tomorrow". If the sender
+  owns the resolution and gives a committed next step, no action is required from
+  the recipient.
 
 Return raw JSON only, no markdown, no explanation:
 {{
