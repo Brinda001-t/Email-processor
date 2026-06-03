@@ -24,14 +24,10 @@ class EmailLog(models.Model):
     confidence_score = models.FloatField(null=True, blank=True)
 
     classification_tokens = models.IntegerField(null=True, blank=True)
-    extraction_tokens = models.IntegerField(null=True, blank=True)
-    total_tokens = models.IntegerField(null=True, blank=True)
 
     rfc_message_id = models.CharField(max_length=500, null=True, blank=True, db_index=True)
     in_reply_to = models.CharField(max_length=500, null=True, blank=True)
     thread_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
-
-    responded_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.subject
@@ -56,14 +52,10 @@ class ReplyEmail(models.Model):
     confidence_score = models.FloatField(null=True, blank=True)
 
     classification_tokens = models.IntegerField(null=True, blank=True)
-    extraction_tokens = models.IntegerField(null=True, blank=True)
-    total_tokens = models.IntegerField(null=True, blank=True)
 
     rfc_message_id = models.CharField(max_length=500, null=True, blank=True, db_index=True)
     in_reply_to = models.CharField(max_length=500, null=True, blank=True)
     thread_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
-
-    responded_at = models.DateTimeField(null=True, blank=True)
 
     parent = models.ForeignKey(
         EmailLog,
@@ -112,9 +104,17 @@ class EscalationRecord(models.Model):
     teams_error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
 
-    @property
-    def linked_email(self):
-        return self.email or self.reply_email
-
     class Meta:
         db_table = 'emailflow].[EscalationRecord'
+
+
+class AppLog(models.Model):
+    level = models.CharField(max_length=20)
+    logger_name = models.CharField(max_length=255)
+    message = models.TextField()
+    traceback = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'emailflow].[AppLog'

@@ -11,19 +11,18 @@ build/
 venv/
 env/
 
-# Django
-*.sqlite3
-db.sqlite3
+
 
 # Environment variables - NEVER push this
 .env
+.env.*
 
 # Celery
 celerybeat-schedule
 celerybeat.pid
 
 # Temp files
-*.pdf
+
 *.log
 
 # IDE
@@ -31,5 +30,19 @@ celerybeat.pid
 .idea/
 
 # OS
-.DS_Store
 Thumbs.db
+.DS_Store
+
+# Django
+db.sqlite3
+staticfiles/
+
+# Credentials / certs
+*.pem
+*.key
+*.pfx
+
+# Test / coverage output
+.coverage
+htmlcov/
+.pytest_cache/

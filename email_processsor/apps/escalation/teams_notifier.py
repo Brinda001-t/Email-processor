@@ -22,15 +22,13 @@ _MAX_RETRIES = 3
 _BACKOFF_BASE = 2  # seconds: 2s, 4s between retries
 
 _PRIORITY_THEME = {
-    "HIGH":   "FF0000",  # red
-    "MEDIUM": "FFA500",  # orange
-    "LOW":    "00AA00",  # green
+    "HIGH":   "FF0000" # red
+
 }
 
 _PRIORITY_ICON = {
-    "HIGH":   "🔴",
-    "MEDIUM": "🟡",
-    "LOW":    "🟢",
+    "HIGH":   "🔴"
+  
 }
 
 

@@ -17,6 +17,7 @@ PRIORITY_HIGH_MINUTES = 60
 
 @shared_task
 def check_and_process_emails():
+    logger.info("check_and_process_emails task started")
     try:
         outlook = OutlookService(token=get_access_token())
         emails = outlook.fetch_unread_emails()
@@ -77,16 +78,83 @@ def _process_single_email(outlook, email):
     if in_reply_to:
         parent = EmailLog.objects.filter(thread_id=thread_id).first() if thread_id else None
         if parent is None:
-            # Reply to a non-escalation thread — no action needed
-            SkipLog.objects.get_or_create(
+            # Parent not in DB (predates system) — classify before deciding to skip
+            if rule_result:
+                _result = {
+                    "type": rule_result["type"],
+                    "subtype": rule_result.get("subtype", "general"),
+                    "confidence": 1.0,
+                    "reason": "rule_based",
+                    "tokens": 0,
+                }
+                _method = "rule_based"
+            else:
+                _result = classify_email(f"Subject: {subject}\n\n{body}")
+                _method = "ai"
+
+            if _result["type"] != "ESCALATION":
+                SkipLog.objects.get_or_create(
+                    message_id=message_id,
+                    defaults={
+                        "sender": sender,
+                        "subject": subject,
+                        "skip_reason": "reply_no_escalation_parent",
+                    },
+                )
+                outlook.mark_as_read(message_id)
+                return
+
+            # Escalation reply with no parent in DB — save to ReplyEmail and alert
+            reply_log, _ = ReplyEmail.objects.get_or_create(
                 message_id=message_id,
                 defaults={
-                    "sender": sender,
                     "subject": subject,
-                    "skip_reason": "reply_no_escalation_parent",
+                    "sender": sender,
+                    "body": body,
+                    "received_at": received_at,
+                    "rfc_message_id": rfc_message_id,
+                    "in_reply_to": in_reply_to,
+                    "thread_id": thread_id,
+                    "parent": None,
+                    "status": "PROCESSED",
+                    "classification": _result["type"],
+                    "email_subtype": _result.get("subtype", "general"),
+                    "classification_method": _method,
+                    "confidence_score": _result.get("confidence"),
+                    "classification_tokens": _result.get("tokens"),
                 },
             )
+            reason = f"Reply classified as ESCALATION (no parent in DB): {subject}"
+            try:
+                record = EscalationRecord.objects.create(reply_email=reply_log, priority="HIGH", reason=reason)
+                alert_payload = {
+                    "subject": subject,
+                    "from": {"emailAddress": {"address": sender}},
+                    "body": {"content": body},
+                }
+                sent, err = send_teams_alert(alert_payload, reason=reason, priority="HIGH")
+                record.teams_sent = sent
+                record.teams_error = "" if sent else err
+                record.save(update_fields=["teams_sent", "teams_error"])
+                logger.info("Escalation alert sent for orphan reply: message_id=%s reply_id=%s", message_id, reply_log.id)
+            except Exception:
+                logger.exception("Failed to send escalation alert for orphan reply message_id=%s", message_id)
+            outlook.mark_as_read(message_id)
+            return
         else:
+            if rule_result:
+                reply_result = {
+                    "type": rule_result["type"],
+                    "subtype": rule_result.get("subtype", "general"),
+                    "confidence": 1.0,
+                    "reason": "rule_based",
+                    "tokens": 0,
+                }
+                reply_method = "rule_based"
+            else:
+                reply_result = classify_email(f"Subject: {subject}\n\n{body}")
+                reply_method = "ai"
+
             ReplyEmail.objects.get_or_create(
                 message_id=message_id,
                 defaults={
@@ -99,8 +167,30 @@ def _process_single_email(outlook, email):
                     "thread_id": thread_id,
                     "parent": parent,
                     "status": "PROCESSED",
+                    "classification": reply_result["type"],
+                    "email_subtype": reply_result.get("subtype", "general"),
+                    "classification_method": reply_method,
+                    "confidence_score": reply_result.get("confidence"),
+                    "classification_tokens": reply_result.get("tokens"),
                 },
             )
+
+            if reply_result["type"] == "ESCALATION":
+                reason = f"Reply classified as ESCALATION on thread: {subject}"
+                try:
+                    record = EscalationRecord.objects.create(email=parent, priority="HIGH", reason=reason)
+                    alert_payload = {
+                        "subject": subject,
+                        "from": {"emailAddress": {"address": sender}},
+                        "body": {"content": body},
+                    }
+                    sent, err = send_teams_alert(alert_payload, reason=reason, priority="HIGH")
+                    record.teams_sent = sent
+                    record.teams_error = "" if sent else err
+                    record.save(update_fields=["teams_sent", "teams_error"])
+                    logger.info("Escalation alert sent for reply: message_id=%s parent_id=%s", message_id, parent.id)
+                except Exception:
+                    logger.exception("Failed to send escalation alert for reply message_id=%s", message_id)
         outlook.mark_as_read(message_id)
         return
 
@@ -144,7 +234,6 @@ def _process_single_email(outlook, email):
         classification_method=method,
         confidence_score=result.get("confidence"),
         classification_tokens=result.get("tokens"),
-        total_tokens=result.get("tokens") or 0,
         status="PROCESSED",
     )
     send_escalation_alert.apply_async(args=[log.id], countdown=PRIORITY_HIGH_MINUTES * 60)
@@ -195,6 +284,12 @@ def escalate_unattended_emails():
         except Exception:
             logger.exception("Failed escalating email id=%s", log.id)
 
+    for reply in ReplyEmail.objects.filter(status="PROCESSED", classification="ESCALATION", parent=None):
+        try:
+            _escalate_orphan_reply(reply, now)
+        except Exception:
+            logger.exception("Failed escalating orphan reply id=%s", reply.id)
+
 
 def _escalate_single(log, now):
     elapsed_minutes = (now - log.received_at).total_seconds() / 60
@@ -237,4 +332,48 @@ def _escalate_single(log, now):
     logger.info(
         "Teams alert sent: email id=%s priority=HIGH elapsed=%.1fmin sender=%s",
         log.id, elapsed_minutes, log.sender,
+    )
+
+
+def _escalate_orphan_reply(reply, now):
+    elapsed_minutes = (now - reply.received_at).total_seconds() / 60
+
+    if elapsed_minutes < PRIORITY_HIGH_MINUTES:
+        return
+
+    existing = EscalationRecord.objects.filter(reply_email=reply).first()
+    if existing:
+        if existing.teams_sent:
+            return
+        alert_payload = {
+            "subject": reply.subject,
+            "from": {"emailAddress": {"address": reply.sender}},
+            "body": {"content": reply.body},
+        }
+        sent, err = send_teams_alert(alert_payload, reason=existing.reason, priority=existing.priority)
+        existing.teams_sent = sent
+        existing.teams_error = "" if sent else err
+        existing.save(update_fields=["teams_sent", "teams_error"])
+        if sent:
+            logger.info("Orphan reply escalation alert retried successfully: reply id=%s", reply.id)
+        else:
+            logger.warning("Orphan reply escalation alert retry failed: reply id=%s error=%s", reply.id, err)
+        return
+
+    reason = f"Reply unattended for {int(elapsed_minutes)} minutes (type: ESCALATION, no parent)"
+    record = EscalationRecord.objects.create(reply_email=reply, priority="HIGH", reason=reason)
+
+    alert_payload = {
+        "subject": reply.subject,
+        "from": {"emailAddress": {"address": reply.sender}},
+        "body": {"content": reply.body},
+    }
+    sent, err = send_teams_alert(alert_payload, reason=reason, priority="HIGH")
+    record.teams_sent = sent
+    record.teams_error = "" if sent else err
+    record.save(update_fields=["teams_sent", "teams_error"])
+
+    logger.info(
+        "Teams alert sent for orphan reply: id=%s priority=HIGH elapsed=%.1fmin sender=%s",
+        reply.id, elapsed_minutes, reply.sender,
     )
