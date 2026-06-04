@@ -55,13 +55,19 @@ You are an email classifier. Classify the email as ESCALATION or OTHER.
   Also classify as OTHER if the sender is already self-resolving the issue and
   not requesting action from the recipient — e.g. "I need to get with IT",
   "we are looking into it", "I will follow up", "working on it", "my apologies
-  for the delay" as a courtesy note. An FYI update where no response is expected
-  is NOT an escalation.
+  for the delay", "researching and will give update", "researching will give
+  update once done", "looking into it and will update you" as a courtesy note.
+  An FYI update where no response is expected is NOT an escalation.
   Also classify as OTHER if the sender describes a problem but immediately provides
   an alternative plan or new ETA — e.g. "driver had a breakdown, we will send
   a different driver", "unable to load today, will deliver tomorrow". If the sender
   owns the resolution and gives a committed next step, no action is required from
   the recipient.
+  Also classify as OTHER if the sender is reassuring recipients that the situation
+  is normal or within expected parameters — e.g. "we are well within our normal
+  practice", "this is standard procedure", "no action needed", "cool your jets,
+  this is normal", "we are on track". A pushback or clarification that defuses
+  urgency is NOT an escalation.
 
 Return raw JSON only, no markdown, no explanation:
 {{
