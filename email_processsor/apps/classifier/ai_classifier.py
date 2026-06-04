@@ -1,5 +1,6 @@
 import json
 import logging
+from html.parser import HTMLParser
 
 import openai
 
@@ -7,8 +8,30 @@ from apps.core.openai_client import client, strip_json_fences
 
 logger = logging.getLogger(__name__)
 
+_MAX_BODY_CHARS = 12000
+
+
+class _StripHTML(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self._parts = []
+
+    def handle_data(self, data):
+        self._parts.append(data)
+
+    def get_text(self):
+        return " ".join(self._parts).strip()
+
+
+def _clean(text):
+    parser = _StripHTML()
+    parser.feed(text)
+    cleaned = parser.get_text() or text
+    return cleaned[:_MAX_BODY_CHARS]
+
 
 def classify_email(email_text):
+    email_text = _clean(email_text)
     prompt = f"""
 You are an email classifier. Classify the email as ESCALATION or OTHER.
 
