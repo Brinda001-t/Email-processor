@@ -126,10 +126,8 @@ def _process_single_email(outlook, email):
                     "classification_tokens": _result.get("tokens"),
                 },
             )
-            reason = f"Reply classified as ESCALATION (no parent in DB): {subject}"
             try:
-                record = EscalationRecord.objects.create(reply_email=reply_log, priority="HIGH", reason=reason)
-                send_reply_escalation_alert.apply_async(args=[record.id], countdown=PRIORITY_HIGH_MINUTES * 60)
+                send_reply_escalation_alert.apply_async(args=[reply_log.id], countdown=PRIORITY_HIGH_MINUTES * 60)
                 logger.info("Escalation alert scheduled for orphan reply: message_id=%s reply_id=%s", message_id, reply_log.id)
             except Exception:
                 logger.exception("Failed to schedule escalation alert for orphan reply message_id=%s", message_id)
@@ -149,7 +147,7 @@ def _process_single_email(outlook, email):
                 reply_result = classify_email(f"Subject: {subject}\n\n{body}")
                 reply_method = "ai"
 
-            ReplyEmail.objects.get_or_create(
+            reply_log, _ = ReplyEmail.objects.get_or_create(
                 message_id=message_id,
                 defaults={
                     "subject": subject,
@@ -170,10 +168,8 @@ def _process_single_email(outlook, email):
             )
 
             if reply_result["type"] == "ESCALATION":
-                reason = f"Reply classified as ESCALATION on thread: {subject}"
                 try:
-                    record = EscalationRecord.objects.create(email=parent, priority="HIGH", reason=reason)
-                    send_reply_escalation_alert.apply_async(args=[record.id], countdown=PRIORITY_HIGH_MINUTES * 60)
+                    send_reply_escalation_alert.apply_async(args=[reply_log.id], countdown=PRIORITY_HIGH_MINUTES * 60)
                     logger.info("Escalation alert scheduled for reply: message_id=%s parent_id=%s", message_id, parent.id)
                 except Exception:
                     logger.exception("Failed to schedule escalation alert for reply message_id=%s", message_id)
@@ -261,30 +257,33 @@ def send_escalation_alert(email_log_id):
 
 
 @shared_task
-def send_reply_escalation_alert(record_id):
+def send_reply_escalation_alert(reply_email_id):
     try:
-        record = EscalationRecord.objects.get(id=record_id)
-    except EscalationRecord.DoesNotExist:
+        reply = ReplyEmail.objects.get(id=reply_email_id)
+    except ReplyEmail.DoesNotExist:
         return
 
-    if record.teams_sent:
-        return
-
-    source = record.reply_email or record.email
-    if not source:
-        logger.warning("EscalationRecord id=%s has no linked email, skipping alert", record_id)
-        return
+    if reply.parent:
+        if EscalationRecord.objects.filter(email=reply.parent, teams_sent=True).exists():
+            return
+        reason = f"Reply classified as ESCALATION on thread: {reply.subject}"
+        record = EscalationRecord.objects.create(email=reply.parent, priority="HIGH", reason=reason)
+    else:
+        if EscalationRecord.objects.filter(reply_email=reply, teams_sent=True).exists():
+            return
+        reason = f"Reply classified as ESCALATION (no parent in DB): {reply.subject}"
+        record = EscalationRecord.objects.create(reply_email=reply, priority="HIGH", reason=reason)
 
     alert_payload = {
-        "subject": source.subject,
-        "from": {"emailAddress": {"address": source.sender}},
-        "body": {"content": source.body},
+        "subject": reply.subject,
+        "from": {"emailAddress": {"address": reply.sender}},
+        "body": {"content": reply.body},
     }
-    sent, err = send_teams_alert(alert_payload, reason=record.reason, priority=record.priority)
+    sent, err = send_teams_alert(alert_payload, reason=reason, priority="HIGH")
     record.teams_sent = sent
     record.teams_error = "" if sent else err
     record.save(update_fields=["teams_sent", "teams_error"])
-    logger.info("Reply escalation alert sent: record id=%s sent=%s", record_id, sent)
+    logger.info("Reply escalation alert sent: record id=%s sent=%s", record.id, sent)
 
 
 @shared_task

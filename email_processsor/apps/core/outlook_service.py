@@ -40,6 +40,7 @@ class OutlookService:
         url = (
             f"{GRAPH_URL}/users/{MAILBOX}/mailFolders/Inbox/messages"
             "?$filter=isRead eq false"
+            "&$orderby=receivedDateTime asc"
             "&$top=50"
             "&$select=id,subject,from,body,conversationId,internetMessageId,internetMessageHeaders,receivedDateTime"
         )
