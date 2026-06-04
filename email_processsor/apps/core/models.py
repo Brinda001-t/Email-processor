@@ -77,6 +77,7 @@ class SkipLog(models.Model):
     sender = models.CharField(max_length=255)
     subject = models.TextField()
     skip_reason = models.CharField(max_length=50)
+    received_at = models.DateTimeField(null=True, blank=True)
     skipped_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

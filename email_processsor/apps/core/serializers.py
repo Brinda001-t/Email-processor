@@ -39,7 +39,8 @@ class EscalationRecordSerializer(serializers.ModelSerializer):
 
 class SkipLogSerializer(serializers.ModelSerializer):
     skipped_at = serializers.DateTimeField(format="%d %b %Y, %I:%M %p")
+    received_at = serializers.DateTimeField(format="%d %b %Y, %I:%M %p")
 
     class Meta:
         model = SkipLog
-        fields = ["id", "sender", "subject", "skip_reason", "skipped_at"]
+        fields = ["id", "sender", "subject", "skip_reason", "received_at", "skipped_at"]
