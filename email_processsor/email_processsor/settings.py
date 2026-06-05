@@ -212,6 +212,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.core.tasks.escalate_unattended_emails",
         "schedule": 900.0,
     },
+
+    #     "renew-graph-subscription-every-2-days": {
+    #     "task": "apps.core.tasks.renew_graph_subscription",
+    #     "schedule": 172800.0,
+    # },
 }
 
 

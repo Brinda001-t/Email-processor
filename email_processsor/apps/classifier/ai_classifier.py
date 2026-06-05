@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from html.parser import HTMLParser
 
 import openai
@@ -24,6 +25,8 @@ class _StripHTML(HTMLParser):
 
 
 def _clean(text):
+    # Remove quoted reply chains before stripping tags so the AI only sees the new message
+    text = re.sub(r"<blockquote[\s\S]*?</blockquote>", "", text, flags=re.IGNORECASE)
     parser = _StripHTML()
     parser.feed(text)
     cleaned = parser.get_text() or text
@@ -84,7 +87,7 @@ Email:
     messages = [{"role": "user", "content": prompt}]
     for attempt in range(2):
         try:
-            res = client.chat.completions.create(model="gpt-4o", messages=messages)
+            res = client.chat.completions.create(model="gpt-4o", messages=messages)     #model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
         except openai.OpenAIError as exc:
             logger.error("OpenAI API call failed (attempt %d/2): %s", attempt + 1, exc)
             raise

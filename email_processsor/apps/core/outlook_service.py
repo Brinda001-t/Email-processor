@@ -84,6 +84,68 @@ class OutlookService:
 
 
 
+
+
+
+
+
+
+
+#----------------------------microsoft grapgh change notification-------------------------------------------------------------------------------------
+
+
+    #     def fetch_email_by_id(self, message_id):
+    #     url = (
+    #         f"{GRAPH_URL}/users/{MAILBOX}/messages/{message_id}"
+    #         "?$select=id,subject,from,body,conversationId,internetMessageId,internetMessageHeaders,receivedDateTime"
+    #     )
+    #     try:
+    #         res = requests.get(url, headers=self.headers(), timeout=30)
+    #         res.raise_for_status()
+    #     except requests.RequestException as exc:
+    #         logger.error("Failed to fetch email %s from Graph API: %s", message_id, exc)
+    #         raise
+    #     return self._normalize(res.json())
+
+    # def create_subscription(self, notification_url, client_state):
+    #     from datetime import datetime, timezone, timedelta
+    #     expiration = (datetime.now(timezone.utc) + timedelta(minutes=4230)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    #     url = f"{GRAPH_URL}/subscriptions"
+    #     payload = {
+    #         "changeType": "created",
+    #         "notificationUrl": notification_url,
+    #         "resource": f"users/{MAILBOX}/mailFolders/Inbox/messages",
+    #         "expirationDateTime": expiration,
+    #         "clientState": client_state,
+    #     }
+    #     try:
+    #         res = requests.post(url, headers=self.headers(), json=payload, timeout=30)
+    #         res.raise_for_status()
+    #     except requests.RequestException as exc:
+    #         logger.error("Failed to create Graph subscription: %s", exc)
+    #         raise
+    #     data = res.json()
+    #     logger.info("Graph subscription created: id=%s expiry=%s", data.get("id"), data.get("expirationDateTime"))
+    #     return data
+
+    # def renew_subscription(self, subscription_id):
+    #     from datetime import datetime, timezone, timedelta
+    #     expiration = (datetime.now(timezone.utc) + timedelta(minutes=4230)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    #     url = f"{GRAPH_URL}/subscriptions/{subscription_id}"
+    #     try:
+    #         res = requests.patch(url, headers=self.headers(), json={"expirationDateTime": expiration}, timeout=30)
+    #         res.raise_for_status()
+    #     except requests.RequestException as exc:
+    #         logger.error("Failed to renew Graph subscription %s: %s", subscription_id, exc)
+    #         raise
+    #     data = res.json()
+    #     logger.info("Graph subscription renewed: id=%s expiry=%s", data.get("id"), data.get("expirationDateTime"))
+    #     return data
+
+
+#---------------------------------------------------------------------------------------------------------------------------------------------
+
+
     # def send_email(self, to_address, subject, body):
     #     url = f"{GRAPH_URL}/users/{MAILBOX}/sendMail"
     #     payload = {
