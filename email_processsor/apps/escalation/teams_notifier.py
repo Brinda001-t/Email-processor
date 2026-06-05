@@ -2,21 +2,9 @@ import os
 import time
 import logging
 import requests
-from html.parser import HTMLParser
 
 from apps.core.openai_client import client
-
-
-class _StripHTML(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self._parts = []
-
-    def handle_data(self, data):
-        self._parts.append(data)
-
-    def get_text(self):
-        return " ".join(self._parts).strip()
+from apps.core.utils import _StripHTML
 
 logger = logging.getLogger(__name__)
 

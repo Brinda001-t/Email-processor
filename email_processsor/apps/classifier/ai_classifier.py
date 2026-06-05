@@ -1,27 +1,15 @@
 import json
 import logging
 import re
-from html.parser import HTMLParser
 
 import openai
 
 from apps.core.openai_client import client, strip_json_fences
+from apps.core.utils import _StripHTML
 
 logger = logging.getLogger(__name__)
 
 _MAX_BODY_CHARS = 12000
-
-
-class _StripHTML(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self._parts = []
-
-    def handle_data(self, data):
-        self._parts.append(data)
-
-    def get_text(self):
-        return " ".join(self._parts).strip()
 
 
 def _clean(text):
@@ -49,6 +37,8 @@ You are an email classifier. Classify the email as ESCALATION or OTHER.
   e.g. driver/truck/shipment held up, not loaded, not dispatched, waiting since yesterday/hours ago,
   still not done. Also treat "please advise" as an escalation signal when paired with a described
   problem, as it indicates the sender is blocked and needs an immediate response.
+  Also escalate: delivery appointment reschedule requests, as they require a human
+  to confirm or deny the new slot.
 
 - OTHER: Anything that does not require urgent attention.
   Also classify as OTHER if the email is a positive confirmation or resolution —
