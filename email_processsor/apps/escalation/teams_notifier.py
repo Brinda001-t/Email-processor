@@ -2,19 +2,9 @@ import os
 import time
 import logging
 import requests
-from html.parser import HTMLParser
 
-
-class _StripHTML(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self._parts = []
-
-    def handle_data(self, data):
-        self._parts.append(data)
-
-    def get_text(self):
-        return " ".join(self._parts).strip()
+from apps.core.openai_client import client
+from apps.core.utils import _StripHTML
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +20,20 @@ _PRIORITY_ICON = {
     "HIGH":   "🔴"
   
 }
+
+
+def _summarize_body(text: str) -> str:
+    try:
+        res = client.chat.completions.create(
+            model="gpt-4o",     #model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+            messages=[{
+                "role": "user",
+                "content": f"Summarize this email in 2-3 sentences:\n\n{text[:4000]}"
+            }]
+        )
+        return res.choices[0].message.content.strip()
+    except Exception:
+        return text[:500] + "..." if len(text) > 500 else text
 
 
 def send_teams_alert(email, reason="", priority="HIGH"):
@@ -49,7 +53,7 @@ def send_teams_alert(email, reason="", priority="HIGH"):
     parser = _StripHTML()
     parser.feed(body_raw)
     body = parser.get_text() or body_raw
-    body_preview = body[:500] + "..." if len(body) > 500 else body
+    body_preview = _summarize_body(body)
 
     theme_color = _PRIORITY_THEME.get(priority, "FF0000")
     icon = _PRIORITY_ICON.get(priority, "🔴")
@@ -73,7 +77,7 @@ def send_teams_alert(email, reason="", priority="HIGH"):
                 "markdown": True,
             },
             {
-                "title": "Email Preview",
+                "title": "Email Summary",
                 "text": body_preview,
                 "markdown": True,
             },

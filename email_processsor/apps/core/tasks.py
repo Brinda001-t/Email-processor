@@ -230,17 +230,20 @@ def send_escalation_alert(email_log_id):
     except EmailLog.DoesNotExist:
         return
 
-    if EscalationRecord.objects.filter(email=log).exists():
-        return
-
     if log.thread_id and ReplyEmail.objects.filter(thread_id=log.thread_id).exists():
         return
 
     reason = f"Email unattended for {PRIORITY_HIGH_MINUTES} minutes (type: {log.classification or 'UNKNOWN'})"
     try:
-        record = EscalationRecord.objects.create(email=log, priority="HIGH", reason=reason)
+        record, created = EscalationRecord.objects.get_or_create(
+            email=log,
+            defaults={"priority": "HIGH", "reason": reason},
+        )
     except Exception:
-        logger.exception("Failed to create EscalationRecord for email id=%s", log.id)
+        logger.exception("Failed to get_or_create EscalationRecord for email id=%s", log.id)
+        return
+
+    if not created:
         return
 
     alert_payload = {
@@ -291,13 +294,13 @@ def escalate_unattended_emails():
     """Watchdog — runs every 15 minutes. Alerts on any ESCALATION email unattended for 60+ minutes."""
     now = timezone.now()
 
-    for log in EmailLog.objects.filter(status="PROCESSED", classification="ESCALATION"):
+    for log in EmailLog.objects.filter(status="PROCESSED", classification="ESCALATION").exclude(escalations__teams_sent=True):
         try:
             _escalate_single(log, now)
         except Exception:
             logger.exception("Failed escalating email id=%s", log.id)
 
-    for reply in ReplyEmail.objects.filter(status="PROCESSED", classification="ESCALATION", parent=None):
+    for reply in ReplyEmail.objects.filter(status="PROCESSED", classification="ESCALATION", parent=None).exclude(escalations__teams_sent=True):
         try:
             _escalate_orphan_reply(reply, now)
         except Exception:
@@ -390,3 +393,40 @@ def _escalate_orphan_reply(reply, now):
         "Teams alert sent for orphan reply: id=%s priority=HIGH elapsed=%.1fmin sender=%s",
         reply.id, elapsed_minutes, reply.sender,
     )
+
+
+
+
+
+
+
+
+
+#---------------------------------------------------------------------------------------
+
+# import os  # add to existing imports at top
+# @shared_task
+# def process_single_email_by_id(message_id):
+#     try:
+#         outlook = OutlookService(token=get_access_token())
+#         email = outlook.fetch_email_by_id(message_id)
+#     except Exception:
+#         logger.exception("Failed to fetch email %s from Graph", message_id)
+#         return
+#     try:
+#         _process_single_email(outlook, email)
+#     except Exception:
+#         logger.exception("Unexpected error processing email %s", message_id)
+
+
+# @shared_task
+# def renew_graph_subscription():
+#     subscription_id = os.getenv("GRAPH_SUBSCRIPTION_ID")
+#     if not subscription_id:
+#         logger.error("GRAPH_SUBSCRIPTION_ID not set — cannot renew subscription")
+#         return
+#     try:
+#         outlook = OutlookService(token=get_access_token())
+#         outlook.renew_subscription(subscription_id)
+#     except Exception:
+#         logger.exception("Failed to renew Graph subscription")

@@ -26,7 +26,7 @@ class ReplyEmailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReplyEmail
-        fields = ["id", "subject", "sender", "received_at", "parent"]
+        fields = ["id", "subject", "sender", "received_at", "classification", "parent"]
 
 
 class EscalationRecordSerializer(serializers.ModelSerializer):

@@ -4,7 +4,7 @@ _SPAM_HEADERS = {"list-unsubscribe", "precedence"}
 _MARKETING_MAILERS = {"mailchimp", "sendgrid", "marketo", "constantcontact", "hubspot", "campaignmonitor"}
 
 _ESCALATION_SUBJECT = re.compile(
-    r"\b(urgent|critical|failed|failure|wrong[\s_-]*delivery|quality[\s_-]*failure|complaint|recall|rejected|rejection)\b",
+    r"\b(urgent|critical|failed|failure|wrong[\s_-]*delivery|quality[\s_-]*failure|complaint|recall|rejected|rejection|reschedule)\b",
     re.IGNORECASE,
 )
 

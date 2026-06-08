@@ -1,29 +1,20 @@
 import json
 import logging
-from html.parser import HTMLParser
+import re
 
 import openai
 
 from apps.core.openai_client import client, strip_json_fences
+from apps.core.utils import _StripHTML
 
 logger = logging.getLogger(__name__)
 
 _MAX_BODY_CHARS = 12000
 
 
-class _StripHTML(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self._parts = []
-
-    def handle_data(self, data):
-        self._parts.append(data)
-
-    def get_text(self):
-        return " ".join(self._parts).strip()
-
-
 def _clean(text):
+    # Remove quoted reply chains before stripping tags so the AI only sees the new message
+    text = re.sub(r"<blockquote[\s\S]*?</blockquote>", "", text, flags=re.IGNORECASE)
     parser = _StripHTML()
     parser.feed(text)
     cleaned = parser.get_text() or text
@@ -46,6 +37,8 @@ You are an email classifier. Classify the email as ESCALATION or OTHER.
   e.g. driver/truck/shipment held up, not loaded, not dispatched, waiting since yesterday/hours ago,
   still not done. Also treat "please advise" as an escalation signal when paired with a described
   problem, as it indicates the sender is blocked and needs an immediate response.
+  Also escalate: delivery appointment reschedule requests, as they require a human
+  to confirm or deny the new slot.
 
 - OTHER: Anything that does not require urgent attention.
   Also classify as OTHER if the email is a positive confirmation or resolution —
@@ -55,13 +48,19 @@ You are an email classifier. Classify the email as ESCALATION or OTHER.
   Also classify as OTHER if the sender is already self-resolving the issue and
   not requesting action from the recipient — e.g. "I need to get with IT",
   "we are looking into it", "I will follow up", "working on it", "my apologies
-  for the delay" as a courtesy note. An FYI update where no response is expected
-  is NOT an escalation.
+  for the delay", "researching and will give update", "researching will give
+  update once done", "looking into it and will update you" as a courtesy note.
+  An FYI update where no response is expected is NOT an escalation.
   Also classify as OTHER if the sender describes a problem but immediately provides
   an alternative plan or new ETA — e.g. "driver had a breakdown, we will send
   a different driver", "unable to load today, will deliver tomorrow". If the sender
   owns the resolution and gives a committed next step, no action is required from
   the recipient.
+  Also classify as OTHER if the sender is reassuring recipients that the situation
+  is normal or within expected parameters — e.g. "we are well within our normal
+  practice", "this is standard procedure", "no action needed", "cool your jets,
+  this is normal", "we are on track". A pushback or clarification that defuses
+  urgency is NOT an escalation.
 
 Return raw JSON only, no markdown, no explanation:
 {{
@@ -78,7 +77,7 @@ Email:
     messages = [{"role": "user", "content": prompt}]
     for attempt in range(2):
         try:
-            res = client.chat.completions.create(model="gpt-4o", messages=messages)
+            res = client.chat.completions.create(model="gpt-4o", messages=messages)     #model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
         except openai.OpenAIError as exc:
             logger.error("OpenAI API call failed (attempt %d/2): %s", attempt + 1, exc)
             raise
